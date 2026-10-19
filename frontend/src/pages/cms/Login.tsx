@@ -8,6 +8,7 @@ import { fetchProfile, login } from '@/services/cms';
 import { getToken, setToken, clearToken } from '@/utils/authToken';
 import { closedToast, resolveAuthError } from './authForm';
 import type { ToastState } from './authForm';
+import { useNoindex } from '@/hooks/useNoindex';
 
 /** 登录失败兜底文案（后端已返回明确 message 时优先用后端文案） */
 const LOGIN_FALLBACK = '登录失败，请稍后重试';
@@ -22,6 +23,8 @@ const LOGIN_FALLBACK = '登录失败，请稍后重试';
  *   失败则清 Token 继续停留登录页（**不阻塞首屏渲染**）。
  */
 export default function Login() {
+  useNoindex();
+
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');

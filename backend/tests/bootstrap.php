@@ -133,6 +133,19 @@ CREATE TABLE product (
     updated_at TEXT NULL
 )
 SQL,
+    'news' => <<<'SQL'
+CREATE TABLE news (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT '',
+    date TEXT NULL,
+    category TEXT NOT NULL DEFAULT '',
+    cover TEXT NOT NULL DEFAULT '',
+    summary TEXT NOT NULL DEFAULT '',
+    content TEXT NULL,
+    created_at TEXT NULL,
+    updated_at TEXT NULL
+)
+SQL,
 ];
 
 foreach ($tables as $name => $ddl) {

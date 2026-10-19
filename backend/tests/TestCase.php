@@ -18,7 +18,7 @@ abstract class TestCase extends BaseTestCase
      * @var string[]
      */
     protected array $tables = [
-        'admin_user', 'admin_session', 'login_attempt', 'message', 'op_log', 'product',
+        'admin_user', 'admin_session', 'login_attempt', 'message', 'op_log', 'product', 'news',
     ];
 
     protected function setUp(): void

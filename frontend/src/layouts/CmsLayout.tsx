@@ -4,6 +4,7 @@ import { CMS_ROUTES } from '@/constants';
 import { fetchProfile, logout as cmsLogout } from '@/services/cms';
 import { clearToken, handleAuthError } from '@/utils/authToken';
 import type { AdminProfile } from '@/types';
+import { useNoindex } from '@/hooks/useNoindex';
 
 /** 导航图标名 */
 type NavIconName =
@@ -125,6 +126,7 @@ function SidebarBrand() {
  * - 账号名来自 `fetchProfile()`；失败交由 `handleAuthError` 分流（1003→登录 / 1006→改密）。
  */
 export default function CmsLayout() {
+  useNoindex();
   const location = useLocation();
   const navigate = useNavigate();
 

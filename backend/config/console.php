@@ -12,5 +12,7 @@ return [
         'oplog:clean' => \app\command\OpLogClean::class,
         // 会话清理：过期 admin_session + 历史登录失败计数（幂等）
         'session:clean' => \app\command\SessionClean::class,
+        // 站点地图：按数据库内容生成静态 sitemap.xml
+        'sitemap:gen' => \app\command\SitemapGen::class,
     ],
 ];

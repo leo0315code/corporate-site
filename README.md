@@ -141,7 +141,7 @@ npm run build        # 产物输出到 frontend/dist
 ```bash
 cd backend
 composer install
-php vendor/bin/phpunit          # 40 个用例；--filter 可单跑
+php vendor/bin/phpunit          # 41 个用例；--filter 可单跑
 ```
 
 覆盖的高风险点：登录锁定与防枚举、会话签发、操作日志白名单/截断/旁路写入、
@@ -381,12 +381,15 @@ php think oplog:clean
 # 过期管理员会话清理（建议与上一条同频执行）
 php think session:clean
 # 站点地图生成（写入 frontend/public/sitemap.xml，构建后随 dist 发布）
+# 换域名后先改 .env 的 SITE_URL，再重新生成 + 重新构建前端
 php think sitemap:gen
 ```
 
 - Linux：`crontab -e` 加 `0 3 * * * cd /var/www/corporate-site/backend && php think oplog:clean && php think session:clean`
 - Windows：任务计划程序创建每日 03:00 任务，程序填 `php.exe`，参数 `think oplog:clean`，起始于 `backend` 目录。
 - 未配置定时任务不影响功能，但 `op_log` / `admin_session` 会持续增长。
+- **内容更新后**建议追加执行 `php think sitemap:gen`（或在发布脚本里串联），保证 sitemap 与线上一致；
+  `robots.txt` 与 `og-cover.png` 位于 `frontend/public/`，随构建一起发布，无需额外配置。
 
 ---
 

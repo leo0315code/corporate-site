@@ -8,6 +8,7 @@ import { fetchProfile, resetPassword } from '@/services/cms';
 import { clearToken, handleAuthError } from '@/utils/authToken';
 import { closedToast, evaluateNewPassword, resolveAuthError, PASSWORD_REQUIREMENT } from './authForm';
 import type { ToastState } from './authForm';
+import { useNoindex } from '@/hooks/useNoindex';
 
 /** 强制改密失败兜底文案 */
 const RESET_FALLBACK = '密码修改失败，请稍后重试';
@@ -22,6 +23,8 @@ const RESET_FALLBACK = '密码修改失败，请稍后重试';
  * - 成功：提示 → 清 Token → 回登录页（后端已作废该账号全部会话）。
  */
 export default function ResetPassword() {
+  useNoindex();
+
   const navigate = useNavigate();
 
   const [checking, setChecking] = useState(true);

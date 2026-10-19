@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# 注意：**不要**在这里写 Disallow 后台路径（如 /manage-x7k2），
+# 那等于把隐藏入口告诉扫描器。后台未登录访问本身返回 1003，且未配置前缀时整体 404；
+# 后台页面另用 <meta name="robots" content="noindex"> 阻止收录。
+
+# 站点地图由 `php think sitemap:gen` 生成（写入 frontend/public/sitemap.xml）
+# 换域名后请同步修改下一行（或用 SITE_URL 环境变量重新生成）
+Sitemap: https://www.example.com/sitemap.xml

@@ -10,10 +10,27 @@
       content="通用企业官网模板 —— 简约大气的企业官网，支持产品服务、新闻中心、联系方式与在线留言。"
     />
     <meta name="keywords" content="企业官网,官网模板,产品服务,新闻中心,联系我们" />
-    <!-- Open Graph 基础标签（SEO 组件会在运行时补充/覆盖） -->
+    <link rel="canonical" href="/" />
+    <!-- Open Graph / 社交分享（SEO 组件会在运行时按页面补充/覆盖 title、description、url） -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="示例科技" />
+    <meta property="og:image" content="/og-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/og-cover.png" />
     <title>示例科技 | 专业的企业数字化解决方案</title>
+    <!-- 结构化数据：换企业时同步修改 name / url / logo -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "示例科技",
+        "url": "https://www.example.com",
+        "logo": "https://www.example.com/logo.svg",
+        "description": "面向企业的数字化解决方案提供商，覆盖云原生、数据智能与行业咨询。"
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
