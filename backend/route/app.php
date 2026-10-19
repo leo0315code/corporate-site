@@ -9,6 +9,7 @@
 use app\middleware\AdminAuth;
 use app\middleware\ContentCache;
 use app\middleware\LoginThrottle;
+use app\middleware\MessageThrottle;
 use think\facade\Route;
 
 /**
@@ -16,8 +17,8 @@ use think\facade\Route;
  * 前台只读内容接口 + 留言提交。内容读接口统一挂 ContentCache（短 TTL 缓存头）。
  */
 Route::group('api', function () {
-    // 留言提交（前台匿名，P0，保持）
-    Route::post('message', 'Message/submit');
+    // 留言提交（前台匿名；IP 维度限流 → 超限 1008 / HTTP 429）
+    Route::post('message', 'Message/submit')->middleware(MessageThrottle::class);
 
     // 前台内容只读（挂缓存头）
     Route::group(function () {

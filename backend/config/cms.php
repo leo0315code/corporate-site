@@ -21,6 +21,10 @@ return [
     // 登录接口限流：同一 IP 每分钟最大请求数
     'rate_limit' => 10,
 
+    // 留言接口限流：同一 IP 在 window 秒内最多 max 次提交（超限 → 1008 / HTTP 429）
+    'message_rate_max'    => (int) env('MESSAGE_RATE_MAX', 5),
+    'message_rate_window' => (int) env('MESSAGE_RATE_WINDOW', 600),
+
     // 操作日志保留天数（默认 180 天；清理命令 oplog:clean 未显式传 --days 时使用）
     'oplog_retain_days' => (int) env('OPLOG_RETAIN_DAYS', 180),
 ];

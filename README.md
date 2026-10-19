@@ -134,6 +134,28 @@ cd frontend
 npm run build        # 产物输出到 frontend/dist
 ```
 
+### 3.4 自动化测试
+
+后端使用 PHPUnit 11（**sqlite 内存库，不需要 MySQL**，可在 CI 直接跑）：
+
+```bash
+cd backend
+composer install
+php vendor/bin/phpunit          # 33 个用例；--filter 可单跑
+```
+
+覆盖的高风险点：登录锁定与防枚举、会话签发、操作日志白名单/截断/旁路写入、
+留言校验与幂等、留言限流阈值、错误码 → HTTP 状态映射、后台路径归一化。
+
+前端类型检查与构建即为其门禁（无单元测试框架，纯逻辑由 `qa-test/` 脚本覆盖）：
+
+```bash
+cd frontend
+npm run typecheck && npm run build
+```
+
+CI：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)，push / PR 时并行跑后端 PHPUnit 与前端类型检查 + 构建。
+
 ---
 
 ## 四、如何换成另一家企业的官网（重点）

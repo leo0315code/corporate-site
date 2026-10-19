@@ -23,6 +23,36 @@ if (!function_exists('success')) {
     }
 }
 
+if (!function_exists('http_status_of')) {
+    /**
+     * 业务错误码 → HTTP 状态码映射
+     *
+     * 目的：让 Nginx access log / WAF / 云监控能按状态码识别异常并设告警阈值，
+     * 而不是所有失败都返回 200。前端 `services/api.ts` 只解析 JSON 体、不检查
+     * `response.ok`，因此提高状态码不会造成前端回归。
+     *
+     * @param int $code 业务错误码
+     * @return int HTTP 状态码
+     */
+    function http_status_of(int $code): int
+    {
+        return match ($code) {
+            0       => 200, // 成功
+            1001,   // 参数校验失败
+            1007    => 400, // 原密码错误
+            1002    => 409, // 重复提交
+            1003,   // 未登录 / Token 无效
+            1004    => 401, // 账号或密码错误
+            1005    => 423, // 账号锁定
+            1006    => 403, // 需先改初始密码
+            1008    => 429, // 限流
+            4004    => 404, // 资源不存在
+            5000    => 500, // 服务器内部异常
+            default => 400, // 未知业务码：保守按客户端错误处理
+        };
+    }
+}
+
 if (!function_exists('fail')) {
     /**
      * 失败响应
@@ -37,7 +67,7 @@ if (!function_exists('fail')) {
             'code'    => $code,
             'message' => $message,
             'data'    => $data,
-        ]);
+        ], http_status_of($code));
     }
 }
 

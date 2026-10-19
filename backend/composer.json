@@ -15,7 +15,8 @@
     },
     "require-dev": {
         "symfony/var-dumper": "^4.2",
-        "topthink/think-trace": "^1.0"
+        "topthink/think-trace": "^1.0",
+        "phpunit/phpunit": "11.5.*"
     },
     "autoload": {
         "psr-4": {
@@ -27,6 +28,11 @@
         "classmap": [
             "extend"
         ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "tests\\": "tests/"
+        }
     },
     "config": {
         "preferred-install": "dist",
