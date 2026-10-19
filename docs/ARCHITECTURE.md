@@ -19,6 +19,11 @@
 
 前端为 **SPA（Vite + React 18 + React Router v6 + Tailwind CSS）**，负责全部页面渲染与交互；后端为 **ThinkPHP 8 + MySQL 8**，当前仅提供留言接口（`POST /api/message` 为 P0）。前端页面内容全部由 **配置 + 数据文件** 驱动（`site.config.ts` / `src/data/*.ts`），后端不参与页面内容下发，从而保证「换企业只改配置文件」。
 
+> ⚠️ **本节为 CMS 上线前的原始架构**。当前实际形态：页面内容已由后端 API 下发
+> （产品/新闻/案例/优势/关于我们/网站配置），`site.config.ts` / `src/data/*.ts` 降级为
+> **空值兜底 + 接口失败兜底**，内容在 CMS 后台在线维护。增量设计见
+> [`ARCHITECTURE-CMS.md`](ARCHITECTURE-CMS.md)，下文保留原始方案仅作演进对照。
+
 ```mermaid
 graph TD
     subgraph Browser["浏览器（PC / 移动端）"]

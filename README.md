@@ -33,7 +33,7 @@ aicode/
 │   ├── tsconfig.json / tsconfig.node.json
 │   ├── public/                   # Logo / 占位图 / 地图占位（可直接替换）
 │   └── src/
-│       ├── config/site.config.ts # ★ 站点配置（公司/导航/联系/页脚/SEO）
+│       ├── config/site.config.ts # ★ 站点配置静态兜底（公司/导航/联系/页脚/SEO；除导航/主题色/快速链接外后台可改，此处为空值兜底）
 │       ├── data/                 # ★ 内容数据（products/news/about/advantages/cases，兼作降级兜底）
 │       ├── types/index.ts        # 全站类型定义
 │       ├── constants/index.ts    # 路由常量 ROUTES / CMS_ROUTES + 文案 MESSAGES + 错误码
@@ -160,26 +160,26 @@ CI：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)，push / PR 时并�
 
 ## 四、如何换成另一家企业的官网（重点）
 
-> 只改 **配置文件 + 数据文件**，不改任何组件代码。
+> 绝大多数内容**在后台在线修改即可，无需改代码、无需重新构建**；
+> 仅导航菜单、页脚快速链接、品牌主色三项仍走前端配置文件（刻意不开放后台，原因见表）。
 
-| 要替换的内容                                      | 修改文件                                            | 说明                                  |
-| ------------------------------------------- | ----------------------------------------------- | ----------------------------------- |
-| 公司名 / Logo / 标语 / 简介 / 导航 / 联系方式 / 页脚 / SEO | `frontend/src/config/site.config.ts`            | 全站统一入口（**站点级，仍走配置文件**）           |
-| 品牌主色                                        | `frontend/tailwind.config.js`（`colors.primary`） | 同步 `site.config.ts` 的 `theme`（用于展示） |
-| 产品 / 服务                                     | `frontend/src/data/products.ts`                 | 迁移前的初始数据；**线上内容优先取后台**            |
-| 新闻                                          | `frontend/src/data/news.ts`                     | 同上                                  |
-| 关于我们 / 发展历程 / 价值观                           | `frontend/src/data/about.ts`                    | 同上                                  |
-| 首页数据优势                                      | `frontend/src/data/advantages.ts`               | 同上                                  |
-| 客户案例                                        | `frontend/src/data/cases.ts`                    | 同上                                  |
-| 图片（Logo/产品图/新闻封面/地图）                        | `frontend/public/`                              | 按文件名替换即可                            |
+| 要替换的内容                     | 修改方式                                        | 说明                                                        |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| 产品 / 新闻 / 案例 / 优势 / 关于我们 | **CMS 后台**对应模块在线增删改                      | `data/*.ts` 仅为迁移数据源 + 接口失败时的降级兜底，改它不影响线上           |
+| 公司名 / Logo / 标语 / 简介 / 联系方式 / 页脚（版权、备案号、社交链接）/ SEO | **CMS 后台「网站配置」**单例编辑                  | 逐字段空值回退 `site.config.ts`，后台留空不会导致前台空白               |
+| 图片（Logo / 产品图 / 新闻封面 / 案例图 / 地图） | **后台表单内上传**（jpg/png/webp/gif，≤5 MB）   | 落盘 `backend/public/uploads/{type}/`，随机文件名；不支持 SVG    |
+| 导航菜单 / 页脚快速链接                      | `frontend/src/config/site.config.ts`        | **刻意不开放后台**：配错路径会直接 404；快速链接与导航同源，避免两处不一致     |
+| 品牌主色                                | `frontend/tailwind.config.js`（`colors.primary`） | 受构建期 Tailwind 编译约束，运行时改色需整体改 CSS 变量注入（独立课题） |
 
 > **内容类数据（产品/新闻/案例/优势/关于我们）已接入 CMS**：
 > 首次通过 `php think cms:init` 从上述 `data/*.ts` 迁移入库；此后线上内容以**数据库为准**
 > （后台在线维护）。`data/*.ts` 保留为**迁移数据源 + 前台接口失败时的降级兜底**，
 > 直接改它们不会影响线上展示（除非重新迁移或接口降级）。
 >
-> **站点级配置**（公司名 / 导航 / 联系方式 / SEO / 主题色）仍由
-> `site.config.ts` + `tailwind.config.js` 驱动，不属于 CMS 管理范围。
+> **站点级配置（公司名 / Logo / 标语 / 简介 / 联系方式 / 页脚 / SEO）同样已接入 CMS**：
+> 由后台「网站配置」模块维护（接口 `GET /api/site/config`，前台 Provider 拉取后覆盖静态值）；
+> `site.config.ts` 仅作为**空值兜底**与 `nav` / `theme` / `footer.quickLinks` 三个
+> 不开放后台的字段的载体。
 
 **修改主色示例**（改为橙红 `#E4572E`）：
 
