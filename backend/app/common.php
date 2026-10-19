@@ -150,6 +150,65 @@ if (!function_exists('random_strong_password')) {
     }
 }
 
+if (!function_exists('random_admin_username')) {
+    /**
+     * 生成随机管理员账号名（`cms_` + 8 位小写字母数字）
+     *
+     * 背景：初始管理员账号名若固定为 `admin`，等于把「后台入口 + 账号」的一半答案
+     * 公开写在文档里，只差一个密码即可爆破。改为随机生成，与随机强密码一起打印，
+     * 使初始凭据**不可枚举**。
+     *
+     * - 首字符固定为字母 `c`，天然满足 `AdminValidate` 的「字母开头」规则；
+     * - 字符池剔除易混淆字符（l/o/0/1），便于人工抄录；
+     * - 使用 `random_int()`（CSPRNG），禁止 `rand()` / `mt_rand()`。
+     *
+     * @param string $prefix 前缀（必须以字母开头，默认 `cms_`）
+     * @return string 形如 `cms_k7m2p9qd`
+     */
+    function random_admin_username(string $prefix = 'cms_'): string
+    {
+        $pool = 'abcdefghijkmnpqrstuvwxyz23456789';
+        $name = $prefix;
+
+        for ($i = 0; $i < 8; $i++) {
+            $name .= $pool[random_int(0, strlen($pool) - 1)];
+        }
+
+        return $name;
+    }
+}
+
+if (!function_exists('password_policy_error')) {
+    /**
+     * 校验密码强度（与初始随机密码同一策略：≥12 位，含大写+小写+数字+符号）
+     *
+     * 供 `cms:init --password=xxx` 使用：允许运维指定初始密码，但不允许指定弱口令。
+     *
+     * @param string $password 待校验密码
+     * @return string|null 通过返回 null，否则返回不满足的原因
+     */
+    function password_policy_error(string $password): ?string
+    {
+        if (mb_strlen($password) < 12) {
+            return '长度至少 12 位';
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            return '需包含大写字母';
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            return '需包含小写字母';
+        }
+        if (!preg_match('/\d/', $password)) {
+            return '需包含数字';
+        }
+        if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+            return '需包含符号';
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('cms_path')) {
     /**
      * 后台路径前缀（归一化）

@@ -10,8 +10,10 @@ use app\model\CaseItem;
 use app\model\News;
 use app\model\Product;
 use app\model\SiteConfig;
+use app\validate\AdminValidate;
 use think\console\Command;
 use think\console\Input;
+use think\console\input\Option;
 use think\console\Output;
 
 /**
@@ -23,7 +25,8 @@ use think\console\Output;
  *   2. 内容迁移：读取 `database/seed/cms-seed.json`，按主键 upsert 导入
  *      products(8) / news(7) / cases(6) / advantages(4) / about(1) / site(1)；advantage 无主键，
  *      采用「表非空则跳过」的幂等策略（二次执行不重复插入）。
- *   3. 管理员：`admin_user` 为空时创建 `admin` 账号并打印随机强初始密码（仅此一次）；
+ *   3. 管理员：`admin_user` 为空时创建初始管理员并打印账号名 + 随机强初始密码（仅此一次）；
+ *      账号名**不再固定为 `admin`**（可用 `--username=` 指定，缺省随机生成），
  *      已存在管理员则跳过（不覆盖、不重置密码）。
  *
  * 安全：不修改/删除 `message` 既有数据；初始密码 ≥12 位（大写+小写+数字+符号）；
@@ -44,7 +47,9 @@ class CmsInit extends Command
     protected function configure(): void
     {
         $this->setName('cms:init')
-            ->setDescription('初始化 CMS：建表 + 迁移内容种子 + 创建默认管理员（幂等）');
+            ->addOption('username', 'u', Option::VALUE_OPTIONAL, '初始管理员账号名（缺省随机生成，不再固定为 admin）')
+            ->addOption('password', 'p', Option::VALUE_OPTIONAL, '初始管理员密码（缺省随机强密码）')
+            ->setDescription('初始化 CMS：建表 + 迁移内容种子 + 创建初始管理员（幂等）');
     }
 
     /**
@@ -75,7 +80,7 @@ class CmsInit extends Command
 
         // 3) 管理员
         try {
-            $this->ensureAdmin($output);
+            $this->ensureAdmin($input, $output);
         } catch (\Throwable $e) {
             $output->writeln('<error>[失败] 管理员初始化中止：' . $e->getMessage() . '</error>');
             return 1;
@@ -410,24 +415,33 @@ class CmsInit extends Command
      * 首次创建的管理员会被标记为**主账号**（`is_primary = 1`）：
      * - 语义：它是系统最初的入口账号，**不得被停用或删除**（服务端强制，见 `AdminService`），
      *   避免后续新建的管理员把初始账号误删 / 恶意停用后接管系统；
-     * - 边界：主账号**不带来任何额外权限**（管理员之间权限完全等同，RBAC 另属 P2-2）；
+     * - 角色：`admin`（超级管理员）；
      * - 幂等：库中一旦已有管理员则整体跳过，不会改动既有账号的 `is_primary` 标记。
      *
+     * 账号名**不再固定为 `admin`**：可用 `--username=` 显式指定，缺省随机生成
+     * （`cms_` + 8 位），避免「入口路径 + 账号名」双固定后被定向爆破。
+     *
+     * @param Input  $input
      * @param Output $output
      * @return void
      */
-    protected function ensureAdmin(Output $output): void
+    protected function ensureAdmin(Input $input, Output $output): void
     {
         $output->writeln('<comment>[3/3] 管理员账号</comment>');
 
         $count = AdminUser::count();
         if ($count > 0) {
-            $output->writeln(sprintf('<info>      已存在管理员（%d 个），跳过创建</info>', $count));
+            $output->writeln(sprintf(
+                '<info>      已存在管理员（%d 个），跳过创建（如需新增请用后台「账号管理」）</info>',
+                $count
+            ));
+
             return;
         }
 
-        $username = 'admin';
-        $password = $this->generatePassword(self::PWD_LENGTH);
+        $username    = $this->resolveUsername($input);
+        $password    = $this->resolvePassword($input);
+        $isGenerated = trim((string) $input->getOption('password')) === '';
 
         /** @var AdminUser $user */
         $user = AdminUser::create([
@@ -446,14 +460,67 @@ class CmsInit extends Command
 
         $output->writeln('');
         $output->writeln('<info>====================================================</info>');
-        $output->writeln('<info>  已创建默认管理员（初始密码仅本次打印，请立即妥善保存）</info>');
+        $output->writeln('<info>  已创建初始管理员（凭据仅本次打印，请立即妥善保存）</info>');
         $output->writeln('<info>----------------------------------------------------</info>');
         $output->writeln('<info>  账号：' . $username . '</info>');
-        $output->writeln('<info>  初始密码：' . $password . '</info>');
+        $output->writeln('<info>  ' . ($isGenerated ? '初始密码' : '指定密码') . '：' . $password . '</info>');
         $output->writeln('<info>  说明：首次登录将强制修改密码（must_change_password=1）</info>');
         $output->writeln('<info>        该账号为主账号，后台不可停用 / 删除</info>');
         $output->writeln('<info>====================================================</info>');
         $output->writeln('');
+    }
+
+    /**
+     * 解析初始管理员账号名
+     *
+     * 优先级：`--username=` > 随机生成（`cms_` + 8 位）。
+     * 显式指定时沿用 `AdminValidate` 的 `adminCreate` 规则（3~50 位、字母开头），
+     * 保证「命令行建的账号」与「后台建的账号」格式完全一致。
+     *
+     * @param Input $input
+     * @return string 合法账号名
+     * @throws \RuntimeException 显式指定的账号名不合规
+     */
+    protected function resolveUsername(Input $input): string
+    {
+        $username = trim((string) $input->getOption('username'));
+
+        if ($username === '') {
+            return random_admin_username();
+        }
+
+        $validate = new AdminValidate();
+        if (!$validate->scene('adminCreate')->check(['username' => $username])) {
+            throw new \RuntimeException('账号名不合法：' . $validate->getError());
+        }
+
+        return $username;
+    }
+
+    /**
+     * 解析初始管理员密码
+     *
+     * 优先级：`--password=` > 随机强密码。显式指定的密码同样要通过强度校验
+     * （≥12 位且含大写+小写+数字+符号），不允许把弱口令带进生产。
+     *
+     * @param Input $input
+     * @return string 通过强度校验的密码
+     * @throws \RuntimeException 显式指定的密码过弱
+     */
+    protected function resolvePassword(Input $input): string
+    {
+        $password = (string) $input->getOption('password');
+
+        if ($password === '') {
+            return $this->generatePassword(self::PWD_LENGTH);
+        }
+
+        $error = password_policy_error($password);
+        if ($error !== null) {
+            throw new \RuntimeException('密码强度不足：' . $error);
+        }
+
+        return $password;
     }
 
     /**

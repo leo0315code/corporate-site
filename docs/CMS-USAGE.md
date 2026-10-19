@@ -47,10 +47,22 @@ E:/ServBay/bin/php.cmd think cms:init      # 或已加入 PATH 时：php think c
 
 1. 执行 `database/cms.sql` 建表（`CREATE TABLE IF NOT EXISTS`；`message` 表按列存在性判断幂等 `ALTER`）。
 2. 读取 `database/seed/cms-seed.json`，按业务主键 `updateOrCreate` 迁移 6 类内容。
-3. 若 `admin_user` 无记录：生成**随机强初始密码**（≥12 位，含大小写 + 数字 + 符号）
+3. 若 `admin_user` 无记录：生成**随机账号名**（`cms_` + 8 位随机字符，如 `cms_k7m2p9qd`，
+   可用 `--username=` 指定）与**随机强初始密码**（≥12 位，含大小写 + 数字 + 符号，可用 `--password=` 指定）
    并以 bcrypt 落库，`must_change_password=1`；**账号名与初始密码打印到终端**。
    若已存在管理员则**跳过**（不覆盖已改密码）。
 4. 终端输出导入统计：`products:8 / news:7 / cases:6 / advantages:4 / about:1 / site:1`。
+
+**可选参数**（只影响第 3 步，缺省即可用）：
+
+| 参数 | 说明 |
+| --- | --- |
+| `--username=name` / `-u` | 指定初始管理员账号名（3~50 位、字母开头，规则同后台新建账号）；**缺省随机生成，不再固定为 `admin`** |
+| `--password=pwd` / `-p` | 指定初始密码；须满足 ≥12 位且含大写 + 小写 + 数字 + 符号，弱口令直接报错退出 |
+
+> 为什么不再默认 `admin`：后台路径已经可以改成随机串（`CMS_PATH`），若账号名再固定为 `admin`，
+> 攻击者只需猜密码一道门。账号名与密码都随机生成，初始凭据才真正不可枚举。
+
 
 ### 2.2 迁移条数核对
 

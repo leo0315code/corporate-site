@@ -99,7 +99,9 @@ composer install
 #    并设置后台路径 CMS_PATH（示例：CMS_PATH=/manage-x7k2；留空=后台关闭）
 
 # 3) 建库建表 + 迁移内容 + 创建管理员（幂等，可重复执行）
-#    会打印后台初始账号与随机强密码（首次），以及导入统计 8/7/6/4/1
+#    会打印后台初始「账号 + 随机强密码」（首次），以及导入统计 8/7/6/4/1
+#    账号名缺省随机生成（如 cms_k7m2p9qd），不再固定 admin；
+#    如需指定：php think cms:init --username=your_name --password='Your#Pass2026'
 php think cms:init
 
 # 4) 启动服务（默认 http://localhost:8000）
