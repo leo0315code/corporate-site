@@ -2,6 +2,7 @@ import Container from '@/components/common/Container';
 import SectionTitle from '@/components/common/SectionTitle';
 import Card from '@/components/common/Card';
 import { SectionEmpty, SectionError, SkeletonCard } from '@/components/common/AsyncState';
+import ThumbImage from '@/components/ThumbImage';
 import type { CaseItem } from '@/types';
 
 export interface CasesSectionProps {
@@ -50,7 +51,7 @@ export default function CasesSection({
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {cases.map((item) => (
               <Card key={item.id} hoverable className="flex items-start gap-4">
-                <img
+                <ThumbImage
                   src={item.logo}
                   alt={item.name}
                   className="h-12 w-12 shrink-0 rounded-md object-contain"

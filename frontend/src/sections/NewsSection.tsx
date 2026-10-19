@@ -3,6 +3,7 @@ import Container from '@/components/common/Container';
 import SectionTitle from '@/components/common/SectionTitle';
 import Button from '@/components/common/Button';
 import { SectionEmpty, SectionError } from '@/components/common/AsyncState';
+import ThumbImage from '@/components/ThumbImage';
 import { ROUTES } from '@/constants';
 import type { NewsItem } from '@/types';
 
@@ -82,7 +83,7 @@ export default function NewsSection({
                 className="group flex flex-col overflow-hidden rounded-md border border-border bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
               >
                 <div className="aspect-[16/10] overflow-hidden bg-bg-soft">
-                  <img
+                  <ThumbImage
                     src={item.cover}
                     alt={item.title}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

@@ -6,6 +6,7 @@ import PageHero from '@/components/common/PageHero';
 import Card from '@/components/common/Card';
 import ProductIcon from '@/components/common/ProductIcon';
 import { SectionEmpty, SectionError, SkeletonCard, DegradedNotice } from '@/components/common/AsyncState';
+import ThumbImage from '@/components/ThumbImage';
 import { useContent } from '@/hooks/useContent';
 import { fetchProductList } from '@/services/api';
 import products from '@/data/products';
@@ -129,7 +130,7 @@ export default function Products() {
                       className="group flex h-full flex-col"
                     >
                       <div className="aspect-[16/10] overflow-hidden rounded-t-md bg-bg-soft">
-                        <img
+                        <ThumbImage
                           src={product.image}
                           alt={product.name}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"

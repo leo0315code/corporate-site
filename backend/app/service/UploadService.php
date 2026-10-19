@@ -29,6 +29,13 @@ use think\Response;
  *
  * 返回给前端的仅为**相对路径**（如 `/uploads/product/9f3c….png`），前端直接写入
  * `image` / `cover` / `logo` 字段即可，无需拼接域名。
+ *
+ * 派生图（编辑体验优化，失败不影响上传）：
+ * - **缩略图** `<随机名>_thumb.webp`（宽 ≤ 480，WebP 质量 80）——列表页/首页卡片用它，
+ *   避免列表按 5MB 原图加载；GIF 跳过（保留动图）。
+ * - **原图压缩**：jpg / webp 且 > 800KB 时，最长边缩到 1920、质量 82 原地重编码；
+ *   PNG 不重编码（无损，且体积收益有限）。
+ * - 派生失败一律静默降级：原图照常可用，前端 `thumbUrl()` 命名约定不命中时回退原图。
  */
 class UploadService
 {
@@ -62,6 +69,24 @@ class UploadService
     /** 上传表单字段名（前端 FormData 的 key） */
     public const FIELD = 'file';
 
+    /** 缩略图文件名后缀（**前端 `thumbUrl()` 依赖此约定**，改动需同步前端） */
+    public const THUMB_SUFFIX = '_thumb.webp';
+
+    /** 缩略图目标宽度（px） */
+    protected const THUMB_WIDTH = 480;
+
+    /** 缩略图 WebP 质量 */
+    protected const THUMB_QUALITY = 80;
+
+    /** 原图压缩阈值（字节）：jpg/webp 超过则重编码 */
+    protected const COMPRESS_THRESHOLD = 800 * 1024;
+
+    /** 原图最长边上限（px） */
+    protected const MAX_EDGE = 1920;
+
+    /** 原图重编码质量 */
+    protected const REENCODE_QUALITY = 82;
+
     /**
      * 处理单张图片上传
      *
@@ -71,7 +96,8 @@ class UploadService
      * @param UploadedFile|null $file 上传文件（`Request::file('file')` 结果）
      * @param string            $type 业务类型（product|news|case|common）
      * @param OpLogContext|null $ctx  操作日志上下文
-     * @return Response 统一响应；成功时 data = { url, path, size, mime, name }
+     * @return Response 统一响应；成功时 data = { url, path, thumb, size, mime, name }
+     *                  （`thumb` 为列表用缩略图，未生成时为空串）
      */
     public function image(?UploadedFile $file, string $type, ?OpLogContext $ctx = null): Response
     {
@@ -131,7 +157,12 @@ class UploadService
             // move() 内部会创建目录并校验写入结果，失败抛 FileException
             $file->move($saveDir, $name);
 
+            $absolute = $saveDir . DIRECTORY_SEPARATOR . $name;
             $relative = '/' . self::UPLOAD_DIR . '/' . $type . '/' . $name;
+
+            // 派生图（失败不影响上传结果，见类注释）
+            $this->compressOriginal($absolute, $mime);
+            $thumb = $this->makeThumb($absolute, $mime, $relative);
 
             $kb = max(1, (int) round($size / 1024));
             OpLogService::record(
@@ -145,11 +176,12 @@ class UploadService
             );
 
             return success([
-                'url'  => $relative,
-                'path' => $relative,
-                'size' => $size,
-                'mime' => $mime,
-                'name' => $name,
+                'url'   => $relative,
+                'path'  => $relative,
+                'thumb' => $thumb,
+                'size'  => $size,
+                'mime'  => $mime,
+                'name'  => $name,
             ]);
         } catch (\Throwable $e) {
             Log::error('[cms:upload] 图片保存失败：' . $e->getMessage());
@@ -157,6 +189,191 @@ class UploadService
 
             return fail($code['SERVER_ERROR'], '图片保存失败，请稍后重试');
         }
+    }
+
+    /**
+     * 缩略图文件名（由原文件名派生，纯字符串运算，便于单测）
+     *
+     * @param string $name 原文件名（如 `9f3c….png`）
+     * @return string 缩略图文件名（如 `9f3c…_thumb.webp`）
+     */
+    public static function thumbName(string $name): string
+    {
+        return pathinfo($name, PATHINFO_FILENAME) . self::THUMB_SUFFIX;
+    }
+
+    /**
+     * 生成列表用缩略图（WebP，宽 ≤ 480）
+     *
+     * 任何一步失败都返回空串，绝不抛出——派生图只是优化，不能拖垮上传。
+     *
+     * @param string $absolute 原图绝对路径
+     * @param string $mime     真实 MIME
+     * @param string $relative 原图对外相对路径（`/uploads/{type}/{name}`）
+     * @return string 缩略图相对路径；未生成时为空串
+     */
+    protected function makeThumb(string $absolute, string $mime, string $relative): string
+    {
+        // GIF 跳过：重编码会丢掉动图
+        if ($mime === 'image/gif') {
+            return '';
+        }
+        if (!function_exists('imagecreatetruecolor') || !function_exists('imagewebp')) {
+            return '';
+        }
+
+        try {
+            $info = @getimagesize($absolute);
+            if (!is_array($info) || ($info[0] ?? 0) < 2 || ($info[1] ?? 0) < 2) {
+                return '';
+            }
+            [$width, $height] = $info;
+
+            $source = $this->createImage($absolute, $mime);
+            if ($source === null) {
+                return '';
+            }
+
+            $targetWidth  = min(self::THUMB_WIDTH, $width);
+            $targetHeight = (int) max(1, round($height * $targetWidth / $width));
+
+            $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+            if ($canvas === false) {
+                imagedestroy($source);
+                return '';
+            }
+
+            // 保留透明通道（PNG / WebP 带 alpha 时不出现黑底）
+            imagealphablending($canvas, false);
+            imagesavealpha($canvas, true);
+            $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+            imagefilledrectangle($canvas, 0, 0, $targetWidth, $targetHeight, (int) $transparent);
+            imagecopyresampled(
+                $canvas,
+                $source,
+                0,
+                0,
+                0,
+                0,
+                $targetWidth,
+                $targetHeight,
+                $width,
+                $height
+            );
+
+            $thumbAbsolute = dirname($absolute) . DIRECTORY_SEPARATOR . self::thumbName(basename($absolute));
+            $ok = imagewebp($canvas, $thumbAbsolute, self::THUMB_QUALITY);
+
+            imagedestroy($canvas);
+            imagedestroy($source);
+
+            return $ok ? self::thumbRelativeOf($relative) : '';
+        } catch (\Throwable $e) {
+            Log::warning('[cms:upload] 缩略图生成失败：' . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * 由原图相对路径推缩略图相对路径（`/uploads/p/a.png` → `/uploads/p/a_thumb.webp`）
+     *
+     * @param string $relative 原图相对路径
+     * @return string
+     */
+    public static function thumbRelativeOf(string $relative): string
+    {
+        $dir = rtrim(dirname($relative), '/\\');
+        return $dir . '/' . self::thumbName(basename($relative));
+    }
+
+    /**
+     * 原图压缩：jpg / webp 且体积 > 800KB 时，最长边压到 1920、质量 82 原地重编码
+     *
+     * PNG 不处理（无损重编码收益有限且耗时）。失败静默忽略。
+     *
+     * @param string $absolute 原图绝对路径
+     * @param string $mime     真实 MIME
+     * @return void
+     */
+    protected function compressOriginal(string $absolute, string $mime): void
+    {
+        if (!in_array($mime, ['image/jpeg', 'image/webp'], true)) {
+            return;
+        }
+        if (!function_exists('imagecreatetruecolor')) {
+            return;
+        }
+
+        try {
+            $size = (int) @filesize($absolute);
+            $info = @getimagesize($absolute);
+            if (!is_array($info) || ($info[0] ?? 0) < 1 || ($info[1] ?? 0) < 1) {
+                return;
+            }
+            [$width, $height] = $info;
+            $longEdge = max($width, $height);
+
+            if ($size <= self::COMPRESS_THRESHOLD && $longEdge <= self::MAX_EDGE) {
+                return;
+            }
+
+            $source = $this->createImage($absolute, $mime);
+            if ($source === null) {
+                return;
+            }
+
+            $scale        = $longEdge > self::MAX_EDGE ? self::MAX_EDGE / $longEdge : 1.0;
+            $targetWidth  = (int) max(1, round($width * $scale));
+            $targetHeight = (int) max(1, round($height * $scale));
+
+            $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+            if ($canvas === false) {
+                imagedestroy($source);
+                return;
+            }
+            imagecopyresampled(
+                $canvas,
+                $source,
+                0,
+                0,
+                0,
+                0,
+                $targetWidth,
+                $targetHeight,
+                $width,
+                $height
+            );
+
+            if ($mime === 'image/jpeg') {
+                imagejpeg($canvas, $absolute, self::REENCODE_QUALITY);
+            } else {
+                imagewebp($canvas, $absolute, self::REENCODE_QUALITY);
+            }
+
+            imagedestroy($canvas);
+            imagedestroy($source);
+        } catch (\Throwable $e) {
+            Log::warning('[cms:upload] 原图压缩失败：' . $e->getMessage());
+        }
+    }
+
+    /**
+     * 按 MIME 载入 GD 图像资源
+     *
+     * @param string $absolute 图片绝对路径
+     * @param string $mime     真实 MIME
+     * @return \GdImage|null 载入失败返回 null
+     */
+    protected function createImage(string $absolute, string $mime): ?\GdImage
+    {
+        $image = match ($mime) {
+            'image/jpeg' => function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($absolute) : false,
+            'image/png'  => function_exists('imagecreatefrompng') ? @imagecreatefrompng($absolute) : false,
+            'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($absolute) : false,
+            default      => false,
+        };
+
+        return $image instanceof \GdImage ? $image : null;
     }
 
     /**

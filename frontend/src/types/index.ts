@@ -349,6 +349,8 @@ export interface ImageUploadResult {
   url: string;
   /** 同 url（语义别名） */
   path: string;
+  /** 列表用缩略图（宽 ≤480 的 WebP；GIF / 生成失败时为空串） */
+  thumb: string;
   /** 文件字节数 */
   size: number;
   /** 服务端探测的真实 MIME */
