@@ -95,7 +95,8 @@ composer install
 # 2) 准备环境变量：复制示例文件
 #    Windows:  copy .example.env .env
 #    macOS/Linux:  cp .example.env .env
-#    按需修改数据库连接（默认 root/root，库名 corporate_site）
+#    按需修改数据库连接（默认 root/root）
+#    库名请填真实库名：cms:init 会按它建库建表（脚本里写死的 corporate_site 会被自动改写）
 #    并设置后台路径 CMS_PATH（示例：CMS_PATH=/manage-x7k2；留空=后台关闭）
 
 # 3) 建库建表 + 迁移内容 + 创建管理员（幂等，可重复执行）

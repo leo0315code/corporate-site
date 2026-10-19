@@ -99,9 +99,13 @@ class CmsInit extends Command
      * 优先带库名连接；若库尚不存在则退化为无库名连接——脚本内的
      * `CREATE DATABASE IF NOT EXISTS` + `USE` 会补建并切换，保证可重复执行。
      *
+     * 库名**以 `.env` 的 `DATABASE` 为准**：脚本内的 `CREATE DATABASE` / `USE` 会被
+     * 就地改写为配置库名（见 `applyDatabaseName()`），避免换库部署时建到写死的
+     * `corporate_site` 上、目标库始终没有表。
+     *
      * @param Output $output
      * @return void
-     * @throws \RuntimeException 脚本缺失或某条语句执行失败
+     * @throws \RuntimeException 脚本缺失、库名非法或某条语句执行失败
      */
     protected function migrate(Output $output): void
     {
@@ -111,10 +115,14 @@ class CmsInit extends Command
             throw new \RuntimeException('建表脚本不存在：' . $sqlFile);
         }
 
-        $sql        = (string) file_get_contents($sqlFile);
+        $sql        = $this->applyDatabaseName((string) file_get_contents($sqlFile));
         $statements = $this->splitSql($sql);
 
-        $output->writeln(sprintf('<comment>[1/3] 建表/迁移：共 %d 条语句</comment>', count($statements)));
+        $output->writeln(sprintf(
+            '<comment>[1/3] 建表/迁移：共 %d 条语句（目标库 %s）</comment>',
+            count($statements),
+            $this->configuredDatabase()
+        ));
 
         $pdo = $this->createPdo();
 
@@ -141,6 +149,66 @@ class CmsInit extends Command
     }
 
     /**
+     * 读取 `.env` 中的目标库名（已做标识符合法性校验）
+     *
+     * @return string
+     * @throws \RuntimeException 未配置或含非法字符
+     */
+    protected function configuredDatabase(): string
+    {
+        /** @var array<string, mixed> $conf */
+        $conf = config('database.connections.mysql');
+        $name = trim((string) ($conf['database'] ?? ''));
+
+        if ($name === '') {
+            throw new \RuntimeException('未配置数据库名：请检查 .env 的 [DATABASE] DATABASE');
+        }
+
+        // 库名会拼进 DDL，必须是纯标识符（不允许反引号/分号等）
+        if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', $name)) {
+            throw new \RuntimeException('数据库名不合法（仅允许字母/数字/下划线，≤64 字符）：' . $name);
+        }
+
+        return $name;
+    }
+
+    /**
+     * 把建表脚本里的库名改写为配置库名
+     *
+     * `database/cms.sql` 为避免「必须改文件才能执行」，保留了一份可直接手工执行的
+     * 默认库名（`corporate_site`）；命令执行时则统一改写为 `.env` 里的实际库名。
+     * 只改写 `CREATE DATABASE IF NOT EXISTS \`x\`` 与行首 `USE \`x\`` 两类语句，
+     * 表名、字段、注释里的同名文本一律不动。
+     *
+     * @param string $sql 原始脚本
+     * @return string 改写后的脚本
+     * @throws \RuntimeException 库名非法
+     */
+    protected function applyDatabaseName(string $sql): string
+    {
+        $dbName = $this->configuredDatabase();
+
+        $rewritten = preg_replace(
+            [
+                '/CREATE\s+DATABASE\s+IF\s+NOT\s+EXISTS\s+`[^`]+`/i',
+                '/^USE\s+`[^`]+`/mi',
+            ],
+            [
+                'CREATE DATABASE IF NOT EXISTS `' . $dbName . '`',
+                'USE `' . $dbName . '`',
+            ],
+            $sql
+        );
+
+        // preg_replace 出错时返回 null（正则回溯上限等），此时宁可失败也不执行半成品脚本
+        if ($rewritten === null) {
+            throw new \RuntimeException('建表脚本文本改写失败：' . (preg_last_error_msg() ?: '未知原因'));
+        }
+
+        return $rewritten;
+    }
+
+    /**
      * 建立用于执行 SQL 脚本的 PDO 连接（读 .env 的 [DATABASE] 配置）
      *
      * @return \PDO
@@ -153,7 +221,7 @@ class CmsInit extends Command
 
         $host    = (string) ($conf['hostname'] ?? '127.0.0.1');
         $port    = (string) ($conf['hostport'] ?? '3306');
-        $dbName  = (string) ($conf['database'] ?? 'corporate_site');
+        $dbName  = $this->configuredDatabase();
         $charset = (string) ($conf['charset'] ?? 'utf8mb4');
         $user    = (string) ($conf['username'] ?? 'root');
         $pass    = (string) ($conf['password'] ?? '');

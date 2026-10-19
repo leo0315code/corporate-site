@@ -46,6 +46,8 @@ E:/ServBay/bin/php.cmd think cms:init      # 或已加入 PATH 时：php think c
 `cms:init` 命令职责（**幂等**，可重复执行）：
 
 1. 执行 `database/cms.sql` 建表（`CREATE TABLE IF NOT EXISTS`；`message` 表按列存在性判断幂等 `ALTER`）。
+   库名取自 `.env` 的 `[DATABASE] DATABASE`：脚本里的 `CREATE DATABASE` / `USE` 会在执行前被**自动改写**为该库名，
+   因此**换库部署无需改 SQL 文件**（手工执行 `cms.sql` 时才会用到文件里写死的 `corporate_site`）。
 2. 读取 `database/seed/cms-seed.json`，按业务主键 `updateOrCreate` 迁移 6 类内容。
 3. 若 `admin_user` 无记录：生成**随机账号名**（`cms_` + 8 位随机字符，如 `cms_k7m2p9qd`，
    可用 `--username=` 指定）与**随机强初始密码**（≥12 位，含大小写 + 数字 + 符号，可用 `--password=` 指定）

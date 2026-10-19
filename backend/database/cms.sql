@@ -3,10 +3,13 @@
 -- 位置：backend/database/cms.sql
 -- 幂等：建表一律 CREATE TABLE IF NOT EXISTS；
 --       message 加列用 information_schema 判断列/索引是否存在，可重复执行。
--- 执行：mysql -uroot -proot < backend/database/cms.sql
+-- 执行：① 推荐 `php think cms:init`（库名自动取 .env 的 DATABASE，下面两处会被改写）
+--       ② 手工执行 `mysql -uroot -proot < backend/database/cms.sql`
+--          —— 此时用的是下面写死的默认库名，换库请自行改这两行
 -- 说明：本脚本不修改/删除 message 既有数据，仅新增列与索引。
 -- ============================================================
 
+-- 默认库名（`cms:init` 执行时会按 .env 的 [DATABASE] DATABASE 自动改写这两处）
 CREATE DATABASE IF NOT EXISTS `corporate_site`
   DEFAULT CHARACTER SET utf8mb4
   COLLATE utf8mb4_general_ci;

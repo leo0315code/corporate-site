@@ -6,6 +6,7 @@ namespace tests\Unit;
 use app\command\CmsInit;
 use tests\TestCase;
 use think\console\Input;
+use think\facade\Config;
 
 /**
  * `cms:init` 初始管理员账号名 / 密码解析用例
@@ -77,5 +78,97 @@ final class CmsInitOptionsTest extends TestCase
     public function testDefaultPasswordMeetsPolicy(): void
     {
         $this->assertNull(password_policy_error($this->resolve('resolvePassword')));
+    }
+
+    /**
+     * 临时改写配置的库名并在结束后还原
+     * @param string $dbName 目标库名
+     * @return array<string, mixed> 修改前的完整 database 配置（供 finally 还原）
+     */
+    private function withDatabase(string $dbName): array
+    {
+        /** @var array<string, mixed> $original */
+        $original = config('database');
+
+        $conf = $original;
+        $conf['connections']['mysql']['database'] = $dbName;
+
+        // 注意：TP8 的 Config::set() **不支持点号嵌套**，必须整块写入 'database'
+        Config::set($conf, 'database');
+
+        return $original;
+    }
+
+    /**
+     * 调用 protected applyDatabaseName
+     * @param string $sql 原始脚本
+     * @return string
+     */
+    private function applyDatabaseName(string $sql): string
+    {
+        $cmd = new CmsInit();
+        $ref = new \ReflectionMethod($cmd, 'applyDatabaseName');
+        $ref->setAccessible(true);
+
+        /** @var string $result */
+        $result = $ref->invoke($cmd, $sql);
+
+        return $result;
+    }
+
+    public function testDatabaseNameIsRewrittenToConfiguredOne(): void
+    {
+        $original = config('database');
+
+        try {
+            $this->withDatabase('shop_prod');
+
+            $sql = "CREATE DATABASE IF NOT EXISTS `corporate_site`\n"
+                . "  DEFAULT CHARACTER SET utf8mb4;\n"
+                . "USE `corporate_site`;\n"
+                . "CREATE TABLE IF NOT EXISTS `admin_user` (`id` INT);\n"
+                . "-- 注释里的 corporate_site 不应被改写\n";
+
+            $out = $this->applyDatabaseName($sql);
+
+            $this->assertStringContainsString('CREATE DATABASE IF NOT EXISTS `shop_prod`', $out);
+            $this->assertStringContainsString('USE `shop_prod`;', $out);
+            $this->assertStringNotContainsString('USE `corporate_site`', $out);
+            $this->assertStringContainsString('`admin_user`', $out, '表名不得被误改');
+            $this->assertStringContainsString('注释里的 corporate_site', $out, '注释不得被误改');
+        } finally {
+            Config::set($original, 'database');
+        }
+    }
+
+    public function testDatabaseNameUnchangedWhenSame(): void
+    {
+        $original = config('database');
+
+        try {
+            $this->withDatabase('corporate_site');
+
+            $sql = "CREATE DATABASE IF NOT EXISTS `corporate_site`;\nUSE `corporate_site`;";
+
+            $this->assertSame($sql, $this->applyDatabaseName($sql));
+        } finally {
+            Config::set($original, 'database');
+        }
+    }
+
+    public function testInvalidDatabaseNameIsRejected(): void
+    {
+        $original = config('database');
+
+        try {
+            $this->withDatabase('bad;DROP DATABASE x');
+
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('数据库名不合法');
+
+            $this->applyDatabaseName('USE `corporate_site`;');
+        } finally {
+            Config::set($original, 'database');
+        }
     }
 }
