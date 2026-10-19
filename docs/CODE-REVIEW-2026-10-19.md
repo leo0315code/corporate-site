@@ -138,10 +138,10 @@
 | P2-6 | SVG 同源执行面 | ✅ 已修复 | 服务端拒绝 SVG（含 `text/xml` 兜底移除）、`.htaccess` 同步、前端 accept 对齐 |
 | P2-7 | 会话不续期/无清理 | ✅ 已修复 | 滑动续期（<30 min 顺延 2h）+ `session:clean` |
 | P2-8 | CORS 回退 `*` | ✅ 已修复 | `CORS_ALLOW_ORIGINS` 白名单，未命中不下发 CORS 头 |
-| P2-10 | SEO 短板 | ◐ 部分完成 | 已补 robots.txt / sitemap:gen / OG 封面 / JSON-LD / noindex；**预渲染仍未做** |
-| P2-9 | slug 主键改 URL 无 301 | ⬜ 待排期 | 需 `slug_history` 表与跳转中间件 |
-| P2-11 | 上传无压缩/缩略图 | ⬜ 待排期 | 需引入 GD 派生图与列表页改造 |
-| P2-12 | ContentService 偏大 | ⬜ 待排期 | 纯重构，建议在有测试兜底后单独 PR |
+| P2-10 | SEO 短板 | ✅ 已修复 | robots.txt / sitemap:gen / OG 封面 / JSON-LD / noindex + **`npm run prerender`（20 条路由独立 title/description/canonical/og + noscript 内链）** |
+| P2-9 | slug 主键改 URL 无 301 | ✅ 已修复（改为不可变） | 后台 `IdField` 编辑态只读；后端编辑命中不到 id → **4004**，不再静默 upsert 新建（`ContentSaveTest` 覆盖） |
+| P2-11 | 上传无压缩/缩略图 | ✅ 已修复 | 上传自动生成 480px WebP 缩略图（`_thumb.webp`）+ jpg/webp >800KB 或长边 >1920 时压缩；列表页改用 `ThumbImage`，失败自动回退原图 |
+| P2-12 | ContentService 偏大 | ✅ 已修复 | 1146 行 → **452 行**；拆出 `content/ContentSchema`（元数据）、`ContentReadService`（前台只读）、`AboutService`、`SiteConfigService`、`ContentDiff`、`TextList` |
 
 ## 六、建议执行顺序
 

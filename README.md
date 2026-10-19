@@ -169,7 +169,7 @@ CI：[`.github/workflows/ci.yml`](.github/workflows/ci.yml)，push / PR 时并�
 | -------------------------- | ------------------------------------------- | --------------------------------------------------------- |
 | 产品 / 新闻 / 案例 / 优势 / 关于我们 | **CMS 后台**对应模块在线增删改                      | `data/*.ts` 仅为迁移数据源 + 接口失败时的降级兜底，改它不影响线上           |
 | 公司名 / Logo / 标语 / 简介 / 联系方式 / 页脚（版权、备案号、社交链接）/ SEO | **CMS 后台「网站配置」**单例编辑                  | 逐字段空值回退 `site.config.ts`，后台留空不会导致前台空白               |
-| 图片（Logo / 产品图 / 新闻封面 / 案例图 / 地图） | **后台表单内上传**（jpg/png/webp/gif，≤5 MB）   | 落盘 `backend/public/uploads/{type}/`，随机文件名；不支持 SVG    |
+| 图片（Logo / 产品图 / 新闻封面 / 案例图 / 地图） | **后台表单内上传**（jpg/png/webp/gif，≤5 MB）   | 落盘 `backend/public/uploads/{type}/`，随机文件名；不支持 SVG；**自动生成 480px WebP 缩略图** |
 | 导航菜单 / 页脚快速链接                      | `frontend/src/config/site.config.ts`        | **刻意不开放后台**：配错路径会直接 404；快速链接与导航同源，避免两处不一致     |
 | 品牌主色                                | `frontend/tailwind.config.js`（`colors.primary`） | 受构建期 Tailwind 编译约束，运行时改色需整体改 CSS 变量注入（独立课题） |
 
@@ -232,6 +232,8 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 - **会话续期**：Token 有效期 2 小时，剩余不足 30 分钟时访问自动顺延 2 小时（滑动续期）。
 - **审计**：所有写操作（含登录失败、上传、账号变更）落 `op_log`，写入旁路——日志失败不影响业务。
 - **刷新即生效**：后台保存 / 删除成功后前端清除内容缓存，前台刷新即见最新内容。
+- **唯一标识 id 创建后不可改**：`id` 直接构成前台详情页 URL，后台编辑态只读；
+  后端对「编辑态 + 目标 id 不存在」返回 `4004`（不再静默新建），避免旧链接 404。
 - **降级兜底**：前台接口失败时回退 `frontend/src/data/*.ts`，不白屏；恢复后点「重新加载」。
 
 ---
@@ -392,6 +394,43 @@ php think sitemap:gen
 - 未配置定时任务不影响功能，但 `op_log` / `admin_session` 会持续增长。
 - **内容更新后**建议追加执行 `php think sitemap:gen`（或在发布脚本里串联），保证 sitemap 与线上一致；
   `robots.txt` 与 `og-cover.png` 位于 `frontend/public/`，随构建一起发布，无需额外配置。
+
+### 7.3 构建与 SEO 预渲染
+
+前台是纯 SPA，`<title>` / `meta` 由 React 运行时写入，爬虫与社交分享抓取常常拿不到内容级元信息。
+构建后执行一次预渲染脚本，可为每条路由生成**独立 HTML 副本**（重写 head 元信息 + `<noscript>` 内链）：
+
+```bash
+cd frontend
+npm run build:seo        # = npm run build && npm run prerender
+# 或分开执行，显式指定域名与后端地址
+npm run prerender -- --base https://your-domain.com --api http://127.0.0.1:8000/api
+```
+
+| 项 | 说明 |
+| --- | --- |
+| 产物 | `dist/index.html` + `dist/{products,news,about,contact}/index.html` + 每条产品/新闻的 `dist/{products,news}/<id>/index.html`（与 sitemap 同源，通常 20 条） |
+| 重写内容 | `<title>`、`description`、`keywords`、`canonical`、`og:title/description/url/type`、Organization JSON-LD 的 `url`、`<noscript>` 导航 |
+| 不做的事 | **不注入 React 树**（因此不会与 `createRoot` 冲突、无需 hydration），页面数据的可见性仍依赖 JS |
+| 降级 | 后端不可达时只生成 5 个静态页，用构建产物里的默认元信息，不会失败退出 |
+| 幂等 | 可重复执行：每次先剥离上一次生成的 `<noscript>` 块，不叠加 |
+| CI | 不参与（CI 只跑 typecheck + build），属**发布期**步骤，需后端与库可用 |
+
+> `sitemap:gen`（后端）与 `prerender`（前端）用同一批路由，替换域名后两者都要重跑；
+> 建议在发布脚本里固定顺序：`sitemap:gen` → `build` → `prerender`。
+
+### 7.4 上传图片的派生图
+
+后台上传成功后会自动生成两类派生文件（**失败静默降级，不影响上传**）：
+
+| 派生 | 规则 | 用途 |
+| --- | --- | --- |
+| 缩略图 | `<随机名>_thumb.webp`，宽 ≤480，WebP q80 | 列表页 / 首页卡片（前端 `ThumbImage` 按命名约定自动替换，缺失时回退原图） |
+| 原图压缩 | jpg/webp 且 >800KB **或** 长边 >1920 → 缩至 1920、质量 82 原地重编码 | 控制详情页体积 |
+
+- GIF 不生成缩略图（保留动图）；PNG 不重编码（无损，收益有限）。
+- 历史图片没有缩略图，前端会自动回退原图，**无需迁移**；如需补齐，重新上传即可。
+- 依赖 PHP `gd` 扩展（CI 已开启），缺失时自动跳过派生。
 
 ---
 
