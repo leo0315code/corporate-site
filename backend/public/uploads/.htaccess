@@ -1,0 +1,39 @@
+# ============================================================
+# 上传目录安全加固（Apache）
+# 目的：即使有恶意文件被写入，也**不可执行**、不被嗅探为其他类型。
+# 说明：Nginx 部署时需在 server 段对本目录追加等价配置（见 docs/CMS-USAGE.md）。
+# 兼容：`Require` 属 Apache 2.4（mod_authz_core）；用 IfModule 包裹以免 2.2 报 500。
+#       禁用 `Options`（常被 AllowOverride 限制而致命），仅用无副作用的指令。
+# ============================================================
+
+# 1) 关闭 PHP 解析（mod_php 场景）
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+  php_flag engine off
+</IfModule>
+
+# 2) 移除所有脚本处理器绑定（FastCGI / CGI 场景）
+<IfModule mod_mime.c>
+  RemoveHandler .php .php3 .php4 .php5 .php7 .php8 .phtml .pht .phar .cgi .pl .py .jsp .asp .aspx .shtml
+  RemoveType .php .php3 .php4 .php5 .php7 .php8 .phtml .pht .phar .cgi .pl .py .jsp .asp .aspx .shtml
+</IfModule>
+
+# 3) 仅允许图片扩展名被直接访问；脚本类一律 403（Apache 2.4）
+<IfModule mod_authz_core.c>
+  <FilesMatch "\.(?i:jpg|jpeg|png|gif|webp|svg)$">
+    Require all granted
+  </FilesMatch>
+  <FilesMatch "\.(?i:php|php3|php4|php5|php7|php8|phtml|pht|phar|cgi|pl|py|jsp|asp|aspx|shtml|htm|html|js|mjs|json|xml|txt|sh|exe|dll)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+# 4) 禁止 MIME 嗅探（防止把图片响应按脚本 / HTML 解释）
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>

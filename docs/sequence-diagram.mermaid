@@ -1,0 +1,53 @@
+sequenceDiagram
+    autonumber
+    actor User as 访客
+    participant Form as MessageForm
+    participant Val as utils/validate
+    participant Api as services/api.ts
+    participant Route as route/app.php
+    participant Ctrl as MessageController
+    participant Vd as MessageValidate
+    participant Svc as MessageService
+    participant Model as MessageModel
+    participant DB as MySQL
+
+    User->>Form: 填写 name/company/phone/email/content
+    User->>Form: 点击「提交」
+    Form->>Form: submitting=true（按钮置灰 + 「提交中…」）
+    Form->>Val: validateMessage(payload)
+    alt 前端校验不通过
+        Val-->>Form: 返回字段错误
+        Form->>User: 字段下方红字提示（不提交）
+        Form->>Form: submitting=false
+    else 前端校验通过
+        Form->>Api: submitMessage(payload)
+        Api->>Route: POST /api/message（JSON）
+        Note over Api,Route: 开发期经 Vite proxy :5173 → :8000
+        Route->>Ctrl: 分发到 Message::submit()
+        Ctrl->>Vd: check(payload)
+        alt 服务端校验失败
+            Vd-->>Ctrl: false + error
+            Ctrl-->>Api: {code:1001, message, data:null}
+            Api-->>Form: 归一化为业务错误
+            Form->>User: 展示失败提示（保留表单内容）
+        else 服务端校验通过
+            Ctrl->>Svc: submit(payload, ip)
+            Svc->>Model: findDuplicate(ip, content)
+            Model->>DB: SELECT id FROM message WHERE ip=? AND content=? AND created_at>? LIMIT 1
+            alt 60s 内重复
+                DB-->>Model: 命中记录
+                Svc-->>Ctrl: 幂等成功（不重复入库）
+            else 非重复
+                Svc->>Model: createMessage(data)
+                Model->>DB: INSERT INTO message(...)
+                DB-->>Model: 影响行数
+                Model-->>Svc: Message 实例
+                Svc-->>Ctrl: 成功
+            end
+            Ctrl-->>Api: {code:0, message:'ok', data:null}
+            Api-->>Form: 解析成功
+            Form->>User: Toast「提交成功，我们会尽快与您联系」
+            Form->>Form: 清空表单 + 冷却 30s
+        end
+        Form->>Form: submitting=false
+    end

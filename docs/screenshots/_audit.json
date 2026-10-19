@@ -1,0 +1,385 @@
+{
+  "generatedAt": "2026-10-16T08:17:49.580Z",
+  "pages": {
+    "home@pc1440": {
+      "url": "http://localhost:5173/",
+      "viewport": "1440x900",
+      "screenshot": "home-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "div",
+          "cls": "pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary",
+          "right": 1536,
+          "width": 320
+        }
+      ]
+    },
+    "about@pc1440": {
+      "url": "http://localhost:5173/about",
+      "viewport": "1440x900",
+      "screenshot": "about-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "products@pc1440": {
+      "url": "http://localhost:5173/products",
+      "viewport": "1440x900",
+      "screenshot": "products-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "product-detail@pc1440": {
+      "url": "http://localhost:5173/products/solution-cloud",
+      "viewport": "1440x900",
+      "screenshot": "product-detail-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news@pc1440": {
+      "url": "http://localhost:5173/news",
+      "viewport": "1440x900",
+      "screenshot": "news-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news-detail@pc1440": {
+      "url": "http://localhost:5173/news/news-2024-06",
+      "viewport": "1440x900",
+      "screenshot": "news-detail-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "contact@pc1440": {
+      "url": "http://localhost:5173/contact",
+      "viewport": "1440x900",
+      "screenshot": "contact-pc1440.png",
+      "scrollW": 1440,
+      "clientW": 1440,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "home@tablet768": {
+      "url": "http://localhost:5173/",
+      "viewport": "768x1024",
+      "screenshot": "home-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "div",
+          "cls": "pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary",
+          "right": 864,
+          "width": 320
+        },
+        {
+          "tag": "div",
+          "cls": "pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/1",
+          "right": 808,
+          "width": 224
+        }
+      ]
+    },
+    "about@tablet768": {
+      "url": "http://localhost:5173/about",
+      "viewport": "768x1024",
+      "screenshot": "about-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "products@tablet768": {
+      "url": "http://localhost:5173/products",
+      "viewport": "768x1024",
+      "screenshot": "products-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "product-detail@tablet768": {
+      "url": "http://localhost:5173/products/solution-cloud",
+      "viewport": "768x1024",
+      "screenshot": "product-detail-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news@tablet768": {
+      "url": "http://localhost:5173/news",
+      "viewport": "768x1024",
+      "screenshot": "news-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news-detail@tablet768": {
+      "url": "http://localhost:5173/news/news-2024-06",
+      "viewport": "768x1024",
+      "screenshot": "news-detail-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "contact@tablet768": {
+      "url": "http://localhost:5173/contact",
+      "viewport": "768x1024",
+      "screenshot": "contact-tablet768.png",
+      "scrollW": 768,
+      "clientW": 768,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "home@mobile375": {
+      "url": "http://localhost:5173/",
+      "viewport": "375x812",
+      "screenshot": "home-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": [
+        {
+          "tag": "div",
+          "cls": "pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary",
+          "right": 471,
+          "width": 320
+        },
+        {
+          "tag": "div",
+          "cls": "pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/1",
+          "right": 415,
+          "width": 224
+        }
+      ]
+    },
+    "about@mobile375": {
+      "url": "http://localhost:5173/about",
+      "viewport": "375x812",
+      "screenshot": "about-mobile375.png",
+      "scrollW": 383,
+      "clientW": 375,
+      "hasHScroll": true,
+      "overflowPx": 8,
+      "offenders": [
+        {
+          "tag": "div",
+          "cls": "ml-8 w-full md:ml-0 md:w-[calc(50%-2rem)] md:pr-8 md:text-right",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "rounded-md border border-border bg-white shadow-sm transition-all duration-300  ",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "ml-8 w-full md:ml-0 md:w-[calc(50%-2rem)] md:pl-8",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "rounded-md border border-border bg-white shadow-sm transition-all duration-300  ",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "ml-8 w-full md:ml-0 md:w-[calc(50%-2rem)] md:pr-8 md:text-right",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "rounded-md border border-border bg-white shadow-sm transition-all duration-300  ",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "ml-8 w-full md:ml-0 md:w-[calc(50%-2rem)] md:pl-8",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "rounded-md border border-border bg-white shadow-sm transition-all duration-300  ",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "ml-8 w-full md:ml-0 md:w-[calc(50%-2rem)] md:pr-8 md:text-right",
+          "right": 383,
+          "width": 327
+        },
+        {
+          "tag": "div",
+          "cls": "rounded-md border border-border bg-white shadow-sm transition-all duration-300  ",
+          "right": 383,
+          "width": 327
+        }
+      ]
+    },
+    "products@mobile375": {
+      "url": "http://localhost:5173/products",
+      "viewport": "375x812",
+      "screenshot": "products-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "product-detail@mobile375": {
+      "url": "http://localhost:5173/products/solution-cloud",
+      "viewport": "375x812",
+      "screenshot": "product-detail-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news@mobile375": {
+      "url": "http://localhost:5173/news",
+      "viewport": "375x812",
+      "screenshot": "news-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "news-detail@mobile375": {
+      "url": "http://localhost:5173/news/news-2024-06",
+      "viewport": "375x812",
+      "screenshot": "news-detail-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "contact@mobile375": {
+      "url": "http://localhost:5173/contact",
+      "viewport": "375x812",
+      "screenshot": "contact-mobile375.png",
+      "scrollW": 375,
+      "clientW": 375,
+      "hasHScroll": false,
+      "overflowPx": 0,
+      "offenders": []
+    },
+    "home-hero@pc1440": {
+      "viewportH": 900,
+      "h1Top": 291,
+      "h1Bottom": 343,
+      "h1Visible": true,
+      "ctaBottom": 59,
+      "ctaVisible": true
+    },
+    "home-hero@tablet768": {
+      "viewportH": 1024,
+      "h1Top": 237,
+      "h1Bottom": 289,
+      "h1Visible": true,
+      "ctaBottom": 59,
+      "ctaVisible": true
+    },
+    "home-hero@mobile375": {
+      "viewportH": 812,
+      "h1Top": 190,
+      "h1Bottom": 260,
+      "h1Visible": true,
+      "ctaBottom": 0,
+      "ctaVisible": true
+    },
+    "products-grid@pc1440": {
+      "cardCount": 8,
+      "perRow": 3,
+      "rowCounts": [
+        3,
+        3,
+        2
+      ]
+    },
+    "products-grid@tablet768": {
+      "cardCount": 8,
+      "perRow": 2,
+      "rowCounts": [
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    "products-grid@mobile375": {
+      "cardCount": 8,
+      "perRow": 1,
+      "rowCounts": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  },
+  "menus": {
+    "mobile": {
+      "buttonCount": 1,
+      "candidates": [
+        {
+          "aria": "打开菜单",
+          "cls": "flex h-10 w-10 items-center justify-center rounded-btn text-secondary md:hidden",
+          "text": ""
+        }
+      ]
+    },
+    "openTest": {
+      "clickedButtonClass": "flex h-10 w-10 items-center justify-center rounded-btn text-secondary md:hidden",
+      "bodyOverflow": "hidden",
+      "htmlOverflow": "",
+      "visibleLinks": 27
+    }
+  },
+  "forms": {}
+}

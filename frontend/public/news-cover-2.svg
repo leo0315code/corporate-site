@@ -1,0 +1,12 @@
+<svg width="800" height="500" viewBox="0 0 800 500" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="荣誉资质（占位封面）">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173DA8"/><stop offset="1" stop-color="#00B4A6"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g)"/>
+  <path d="M0 360L200 240 380 340 560 200 800 320V500H0V360Z" fill="#FFFFFF" opacity="0.10"/>
+  <circle cx="660" cy="120" r="90" fill="#FFFFFF" opacity="0.12"/>
+  <text x="60" y="120" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF" opacity="0.95">NEWS</text>
+  <text x="60" y="160" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="18" fill="#FFFFFF" opacity="0.75">荣誉资质</text>
+</svg>

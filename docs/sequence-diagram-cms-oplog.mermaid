@@ -1,0 +1,145 @@
+%% ============================================================
+%% 操作日志模块（C-P1-3）时序图集
+%% 与 docs/ARCHITECTURE-CMS-OPLOG.md 第十节一致
+%% 覆盖：(i) 内容保存完整记录 (ii) 登录失败记录 (iii) 查询页筛选链路
+%% ============================================================
+
+%% ---------- 10.1 一次「内容保存」被完整记录（含 admin 上下文获取路径） ----------
+sequenceDiagram
+    autonumber
+    actor U as 运营人员
+    participant P as cms/ProductsManage 页
+    participant Api as services/cms.ts
+    participant Au as AdminAuth
+    participant Ctrl as ContentController
+    participant Svc as ContentService
+    participant Ctx as OpLogContext
+    participant Log as OpLogService
+    participant M as Product 模型
+    participant DB as MySQL
+
+    U->>P: 编辑一行 → 保存
+    P->>Api: save('product', form)
+    Api->>Au: POST {CMS_PATH}/api/content/product/save（Bearer）
+    Au->>Au: 校验 Token / status / 强制改密闸门
+    alt 未登录/失效
+        Au-->>Api: {code:1003} → 跳登录
+    else 未改初始密码
+        Au-->>Api: {code:1006} → 跳改密
+    else 通过
+        Au->>Ctx: fromRequest(request)（admin_id/name + ip + ua）
+        Au->>Au: request.admin = $admin; request.opLogContext = ctx
+        Au->>Ctrl: 放行
+        Ctrl->>Svc: save('product', data, request.opLogContext)
+        Svc->>Svc: 归一化 + 校验（先定 $isEdit）
+        alt 校验失败
+            Svc->>Log: record('product', $isEdit?'update':'create', 0, '校验失败：…', id, '', ctx)
+            Log->>Log: buildRow 白名单裁剪 + try/catch
+            Svc-->>Ctrl: {code:1001, message}
+        else 通过
+            Svc->>M: find(id)（编辑分支，先取旧行 + target_name=name）
+            M->>DB: SELECT * FROM product WHERE id=?
+            Svc->>M: save(normalized)
+            M->>DB: INSERT / UPDATE
+            Svc->>Svc: 计算变更字段列表
+            Svc->>Log: record('product','update',1,'变更字段：title, summary', id, name, ctx)
+            Log->>Log: buildRow（白名单）+ OpLog::create
+            Log->>DB: INSERT INTO op_log …
+            Svc-->>Ctrl: {code:0, data:saved}
+        end
+        Ctrl-->>Api: 统一响应
+        Api-->>P: Toast「保存成功」+ 刷新列表
+    end
+    Note over Log,DB: 写入失败？record() 内部 try/catch 全包 → 仅 Log::error，绝不阻断保存
+
+%% ---------- 10.2 一次「登录失败」的记录 ----------
+sequenceDiagram
+    autonumber
+    actor U as 使用者
+    participant L as cms/Login 页
+    participant Api as services/cms.ts
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Ctx as OpLogContext
+    participant LA as LoginAttempt
+    participant AU as AdminUser
+    participant Log as OpLogService
+    participant DB as MySQL
+
+    U->>L: 输入账号 + 密码，提交
+    L->>Api: login({username, password})
+    Api->>Ctrl: POST {CMS_PATH}/api/login（无 AdminAuth，走 LoginThrottle）
+    Ctrl->>Svc: login(username, password, ip, ua)
+    Svc->>LA: checkLocked('ip', ip) / checkLocked('account', username)
+    alt IP/账号已锁定
+        LA-->>Svc: 剩余秒数 > 0
+        Svc->>Ctx: forLoginAttempt(username, ip, ua)（admin_id=0，清洗截断账号名）
+        Svc->>Log: record('auth','login',0,'登录失败：账号或 IP 已锁定', username, username, ctx)
+        Svc-->>Ctrl: {code:1005, message:'… 请 N 分钟后再试'}
+    else 未锁定
+        Svc->>AU: findActiveByUsername(username) + verifyPassword
+        alt 密码错误 或 账号不存在
+            AU-->>Svc: 校验不通过
+            Svc->>LA: recordFail('ip', ip) / recordFail('account', username)
+            LA->>DB: UPSERT fail_count（>=5 写 locked_until）
+            Svc->>Ctx: forLoginAttempt(username, ip, ua)
+            Svc->>Log: record('auth','login',0,'登录失败：账号或密码错误', username, username, ctx)
+            Log->>DB: INSERT INTO op_log（try/catch 旁路）
+            Svc-->>Ctrl: {code:1004}（或本次刚触发锁定时 1005）
+        else 校验通过
+            Svc->>LA: reset('ip') / reset('account')
+            Svc->>Svc: issue Token + markLogin
+            Svc->>Log: record('auth','login',1,'登录成功', username, username, ctx(真实 admin))
+            Svc-->>Ctrl: {code:0, data:{token,…}}
+        end
+    end
+    Ctrl-->>Api: 统一响应
+    Api-->>L: 展示（成功进入后台 / 失败展示统一文案）
+    Note over Svc,Log: 失败原因统一「账号或密码错误」，绝不含「账号不存在」，防枚举
+
+%% ---------- 10.3 查询页筛选链路 ----------
+sequenceDiagram
+    autonumber
+    actor U as 运营主管
+    participant P as cms/LogsManage 页
+    participant Api as services/cms.ts
+    participant Au as AdminAuth
+    participant Ctrl as OpLogController
+    participant Svc as OpLogService
+    participant M as OpLog 模型
+    participant DB as MySQL
+
+    U->>P: 打开「操作日志」（默认最近 7 天）
+    P->>Api: fetchOpLogList({page:1, size:10, start_date:今天-6, end_date:今天})
+    Api->>Au: GET {CMS_PATH}/api/oplog/list?…
+    Au->>Au: Token / status / 强制改密闸门
+    alt 未登录/失效
+        Au-->>Api: {code:1003} → 跳登录
+    else 通过
+        Au->>Ctrl: 注入 admin + opLogContext 并放行
+        Ctrl->>Svc: list(page, size, module, admin_name, result, keyword, start_date, end_date)
+        Svc->>Svc: 参数校验（module/result/日期）
+        alt 参数非法
+            Svc-->>Ctrl: {code:1001, message}
+        else 合法
+            Svc->>M: 组装 where（module/created_at 范围/admin_name/result + keyword LIKE）
+            M->>DB: SELECT … ORDER BY created_at DESC, id DESC LIMIT offset,size
+            DB-->>M: 行集（走 idx_module_created / idx_created 等）
+            M-->>Svc: OpLog[]
+            Svc-->>Ctrl: {code:0, data:{total,page,size,items}}
+        end
+        Ctrl-->>Api: 统一响应
+        Api-->>P: 渲染表格（加载态 → 数据/空态；失败展示错误 + 重试）
+    end
+
+    U->>P: 点「详情」
+    P->>Api: fetchOpLogDetail(id)
+    Api->>Ctrl: GET {CMS_PATH}/api/oplog/detail?id=
+    Ctrl->>Svc: detail(id)
+    alt 未命中
+        Svc-->>Ctrl: {code:4004, message:'资源不存在'}
+    else 命中
+        Svc-->>Ctrl: {code:0, data:OpLogItem}
+    end
+    Ctrl-->>Api: 统一响应
+    Api-->>P: 只读抽屉展示全部字段 + 「不可修改/删除」提示

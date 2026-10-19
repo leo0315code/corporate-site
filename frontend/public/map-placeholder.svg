@@ -1,0 +1,22 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="地图位置占位图">
+  <rect width="960" height="540" fill="#EEF3FF"/>
+  <!-- 道路网格 -->
+  <g stroke="#CFD8E6" stroke-width="3">
+    <path d="M0 120H960M0 240H960M0 360H960M0 470H960"/>
+    <path d="M160 0V540M340 0V540M520 0V540M700 0V540M860 0V540"/>
+  </g>
+  <g stroke="#DCE4F0" stroke-width="2">
+    <path d="M0 60H960M0 180H960M0 300H960M0 420H960"/>
+    <path d="M80 0V540M250 0V540M430 0V540M610 0V540M780 0V540"/>
+  </g>
+  <!-- 河流/绿地 -->
+  <path d="M0 500C200 460 300 520 480 490S760 460 960 500V540H0V500Z" fill="#D6F5F1"/>
+  <circle cx="820" cy="140" r="80" fill="#E4F3E9"/>
+  <!-- 定位标记 -->
+  <g transform="translate(480 250)">
+    <path d="M0 60C0 60 40 20 40 -10A40 40 0 10-40 -10C-40 20 0 60 0 60Z" fill="#1E4FD8"/>
+    <circle cx="0" cy="-10" r="15" fill="#FFFFFF"/>
+  </g>
+  <text x="480" y="360" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="600" fill="#5A6472">地图占位 · 部署方可替换为真实地图</text>
+  <text x="480" y="396" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#8C97A6">site.config.ts → contact.mapImage</text>
+</svg>

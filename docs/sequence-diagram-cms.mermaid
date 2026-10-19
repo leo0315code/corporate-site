@@ -1,0 +1,384 @@
+%% ============================================================
+%% CMS 增量时序图集（登录 / 内容 CRUD / 前台动态读取）
+%% 与 docs/ARCHITECTURE-CMS.md 第五节一致
+%% ============================================================
+
+%% ---------- 5.1 登录（失败计数 / 锁定 / 首次强制改密） ----------
+sequenceDiagram
+    autonumber
+    actor U as 运营人员
+    participant L as cms/Login 页
+    participant Api as services/cms.ts
+    participant Th as LoginThrottle
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant Vd as AuthValidate
+    participant LA as LoginAttempt
+    participant AU as AdminUser
+    participant SS as AdminSession
+    participant DB as MySQL
+
+    U->>L: 输入账号 + 密码，点击登录
+    L->>L: submitting=true（按钮置灰）
+    L->>Api: login({username, password})
+    Api->>Th: POST {CMS_PATH}/api/login
+    Th->>Th: 同 IP 1 分钟计数 > 10 ?
+    alt 触发限流
+        Th-->>Api: {code:1008, message:'请求过于频繁'}
+    else 未触发
+        Th->>Ctrl: 放行
+        Ctrl->>Vd: scene('login').check(payload)
+        alt 参数不合法
+            Vd-->>Ctrl: false
+            Ctrl-->>Api: {code:1001, message}
+        else 合法
+            Ctrl->>Svc: login(username, password, ip, ua)
+            Svc->>LA: checkLocked('ip', ip)
+            LA->>DB: SELECT locked_until WHERE scope='ip' AND scope_key=ip
+            alt IP 已锁定
+                Svc-->>Ctrl: {code:1005, message:'… 请 N 分钟后再试'}
+            else IP 未锁
+                Svc->>LA: checkLocked('account', username)
+                LA->>DB: SELECT locked_until WHERE scope='account' AND scope_key=username
+                alt 账号已锁定
+                    Svc-->>Ctrl: {code:1005, message:'… 请 N 分钟后再试'}
+                else 未锁定
+                    Svc->>AU: findByUsername(username)
+                    AU->>DB: SELECT * WHERE username=? AND status=1
+                    alt 账号不存在 或 password_verify 失败
+                        Svc->>LA: recordFail('ip', ip) / recordFail('account', username)
+                        LA->>DB: UPSERT（fail_count++，>=5 则 locked_until=now+600）
+                        Svc-->>Ctrl: {code:1004, message:'账号或密码错误'}
+                    else 校验通过
+                        Svc->>LA: reset('ip', ip) / reset('account', username)
+                        LA->>DB: UPDATE fail_count=0, locked_until=NULL
+                        Svc->>SS: issue(admin.id, token, 7200, ip, ua)
+                        SS->>DB: INSERT INTO admin_session(token, expires_at, …)
+                        Svc->>AU: 更新 last_login_at / last_login_ip
+                        Svc-->>Ctrl: {code:0, data:{token, expires_at, must_change_password, profile}}
+                    end
+                end
+            end
+        end
+        Ctrl-->>Api: 统一响应
+    end
+    Api-->>L: 解析结果
+    alt code == 0 且 must_change_password == true
+        L->>U: 存 token，强制跳 /{CMS_PATH}/reset-password
+    else code == 0
+        L->>U: 存 token，进入 /{CMS_PATH}
+    else 其他错误码
+        L->>U: 展示 message（1004 统一文案 / 1005 含剩余时间）
+    end
+    L->>L: submitting=false
+
+%% ---------- 5.2 内容 CRUD（Token 鉴权 + 1003 / 1006） ----------
+sequenceDiagram
+    autonumber
+    actor U as 运营人员
+    participant P as cms/*Manage 页
+    participant Api as services/cms.ts
+    participant Au as AdminAuth
+    participant Ctrl as ContentController
+    participant Svc as ContentService
+    participant Vd as ContentValidate
+    participant M as Model(Product/News/…)
+    participant DB as MySQL
+
+    U->>P: 打开「产品管理」
+    P->>Api: list('product', {page,size,keyword})
+    Api->>Api: 读取 localStorage token → Authorization: Bearer
+    Api->>Au: GET {CMS_PATH}/api/product/list
+    Au->>Au: 解析 Bearer token
+    alt 无 token / token 无效或过期
+        Au-->>Api: {code:1003}
+        Api->>Api: 清 token → 跳 /{CMS_PATH}/login
+    else token 有效但未改初始密码
+        Au-->>Api: {code:1006}
+        Api->>Api: 跳 /{CMS_PATH}/reset-password
+    else 通过
+        Au->>Ctrl: 注入 $request->admin 并放行
+        Ctrl->>Svc: list('product', query)
+        Svc->>M: page + keyword 查询（ORM 参数绑定）
+        M->>DB: SELECT … WHERE name LIKE ? ORDER BY created_at DESC LIMIT ?
+        DB-->>M: 行集
+        M-->>Svc: Product[]
+        Svc-->>Ctrl: {code:0, data:{total,page,size,items}}
+        Ctrl-->>Api: 响应
+        Api-->>P: 渲染表格（加载态 → 数据/空态）
+    end
+
+    U->>P: 编辑一行 → 保存
+    P->>Api: save('product', form)
+    Api->>Au: POST {CMS_PATH}/api/product/save（Bearer）
+    Au->>Ctrl: 放行
+    Ctrl->>Vd: scene('product').check(data)
+    alt 校验失败
+        Vd-->>Ctrl: false
+        Ctrl-->>Api: {code:1001, message}
+        Api-->>P: 字段红字提示，保留已填内容
+    else 通过
+        Ctrl->>Svc: save('product', data)
+        Svc->>M: updateOrCreate(id 或 auto)
+        M->>DB: INSERT / UPDATE（白名单字段，ORM 绑定）
+        DB-->>M: 影响行数
+        Svc-->>Ctrl: {code:0, data: saved}
+        Ctrl-->>Api: 响应
+        Api-->>P: Toast「保存成功」+ 刷新列表
+    end
+
+    U->>P: 删除一行 → 二次确认
+    P->>Api: remove('product', id)
+    Api->>Au: POST {CMS_PATH}/api/product/delete（Bearer）
+    Au->>Ctrl: 放行
+    Ctrl->>Svc: remove('product', id)
+    Svc->>M: delete(id)
+    M->>DB: DELETE FROM product WHERE id=?
+    Svc-->>Ctrl: {code:0}
+    Ctrl-->>Api: 响应
+    Api-->>P: Toast「已删除」+ 刷新列表
+
+%% ---------- 5.3 前台动态读取（加载态 / 错误降级） ----------
+sequenceDiagram
+    autonumber
+    actor V as 访客
+    participant PG as Home / Products / News / About 页
+    participant Hook as hooks/useContent
+    participant Api as services/api.ts
+    participant Cache as 内存缓存(TTL 60s)
+    participant Ctrl as ContentController / HomeController
+    participant Svc as ContentService / HomeService
+    participant DB as MySQL
+    participant FB as src/data/*.ts（降级）
+
+    V->>PG: 访问首页
+    PG->>PG: 先渲染 Hero/联系方式；内容区块进入骨架屏
+    PG->>Hook: useContent('home')
+    Hook->>Api: fetchHomeSummary()
+    Api->>Cache: 命中且未过期？
+    alt 命中缓存
+        Cache-->>Api: 返回缓存
+    else 未命中
+        Api->>Ctrl: GET /api/home/summary
+        Ctrl->>Svc: summary(productLimit, newsLimit)
+        Svc->>DB: SELECT products / advantages / cases / news（ORM 绑定）
+        DB-->>Svc: 数据
+        Svc-->>Ctrl: {code:0, data:HomeSummary}
+        Ctrl-->>Api: 响应
+        Api->>Cache: 写入（短 TTL）
+    end
+    alt 请求成功
+        Api-->>Hook: HomeSummary → 区块渲染（退出骨架屏）
+    else 请求失败（网络/500）
+        Api-->>Hook: 抛出异常
+        Hook->>FB: 降级读取本地 data/*.ts
+        FB-->>Hook: 兜底数据
+        Hook-->>PG: 渲染兜底内容 + 顶部轻提示
+    end
+    PG-->>V: 内容呈现
+
+    V->>PG: 访问 /products/:id
+    PG->>Hook: useContent('product-detail', id)
+    Hook->>Api: fetchProductDetail(id)
+    Api->>Ctrl: GET /api/product/detail?id=
+    alt 命中
+        Ctrl-->>Api: {code:0, data:Product}
+        Api-->>Hook: Product → 渲染详情
+    else 未命中（4004）
+        Api-->>Hook: 抛 4004
+        Hook-->>PG: 渲染「未找到」友好页
+    end
+
+%% ---------- 5.4 站点配置运行时注入（静态首帧 + 挂载后覆盖 + 静默回退） ----------
+sequenceDiagram
+    autonumber
+    actor V as 访客
+    participant ML as MainLayout
+    participant Pvd as SiteConfigProvider
+    participant SC as config/site.config.ts（静态）
+    participant Api as services/api.ts
+    participant Cache as 内存缓存(TTL 60s)
+    participant Ctrl as PublicContentController
+    participant Svc as ContentService
+    participant DB as MySQL
+    participant C as Navbar / Footer / SEO / 各页
+
+    V->>ML: 打开任意前台页
+    ML->>Pvd: 挂载（初始 state = staticSiteConfig）
+    Pvd->>SC: 读取静态兜底值（同步）
+    SC-->>Pvd: 完整 SiteConfig（含 nav/theme/quickLinks）
+    Pvd-->>C: 首帧即用静态值渲染（不闪白）
+    Pvd->>Api: useEffect → fetchSiteConfig()
+    Api->>Cache: 命中且未过期？
+    alt 命中缓存
+        Cache-->>Api: 返回缓存
+    else 未命中
+        Api->>Ctrl: GET /api/site/config
+        Ctrl->>Svc: getSiteConfig()
+        Svc->>DB: SELECT * FROM site_config WHERE id=1
+        DB-->>Svc: 行（扁平 snake_case）
+        Svc-->>Ctrl: {code:0, data:SiteConfigData}（嵌套 camelCase，不含 nav/theme/quickLinks）
+        Ctrl-->>Api: 响应
+        Api->>Cache: 写入（短 TTL）
+    end
+    alt 请求成功
+        Api-->>Pvd: SiteConfigData
+        Pvd->>Pvd: mergeSiteConfig(static, data)：空值保留静态；nav/theme/quickLinks 始终取静态
+        Pvd-->>C: 覆盖渲染（公司名/联系方式/页脚/SEO 即时生效）
+    else 请求失败（网络/500）
+        Api-->>Pvd: 抛出异常
+        Pvd->>Pvd: 静默回退（保持静态值，不报错、不空白）
+    end
+
+%% ---------- 5.5 账号管理（新建一次性密码 / 停用保底 / 删除二次确认） ----------
+sequenceDiagram
+    autonumber
+    actor U as 运营人员（当前登录管理员）
+    participant P as cms/AccountsManage 页
+    participant Api as services/cms.ts
+    participant Au as AdminAuth
+    participant Ctrl as AdminController
+    participant Svc as AdminService
+    participant Vd as AdminValidate
+    participant MU as AdminUser
+    participant MS as AdminSession
+    participant DB as MySQL
+
+    Note over U,DB: 一、新建账号（生成一次性随机强密码）
+    U->>P: 点击「新建账号」→ 填账号名 → 提交
+    P->>Api: createAdmin(username)
+    Api->>Au: POST {CMS_PATH}/api/admin/create（Bearer）
+    Au->>Ctrl: 通过（未改初始密码则 1006）
+    Ctrl->>Vd: scene('adminCreate').check({username})
+    alt 账号名格式非法
+        Vd-->>Ctrl: false
+        Ctrl-->>Api: {code:1001, message}
+        Api-->>P: 字段红字提示
+    else 格式合法
+        Vd-->>Ctrl: true
+        Ctrl->>Svc: create(username)
+        Svc->>MU: findByUsername(username)（含已停用账号）
+        alt 账号已存在
+            MU-->>Svc: 命中
+            Svc-->>Ctrl: {code:1002, message:「账号已存在」}
+            Ctrl-->>Api: 响应
+        else 不重复
+            Svc->>Svc: random_strong_password(16)
+            Svc->>MU: createAccount(username, plain)（status=1, must_change=1, 落库仅 bcrypt）
+            MU->>DB: INSERT INTO admin_user …
+            DB-->>MU: id
+            Svc-->>Ctrl: {code:0, data:{id, username, password}}
+            Ctrl-->>Api: 响应（password 明文，仅此一次）
+            Api-->>P: 弹「凭据面板」+ 复制按钮 + 提示「仅本次展示」
+        end
+    end
+
+    Note over U,DB: 二、启用 / 停用（≥1 启用保底 + 踢下线）
+    U->>P: 行内「停用」→ 二次确认
+    P->>Api: toggleAdminStatus(id, 0)
+    Api->>Au: POST {CMS_PATH}/api/admin/toggle-status（Bearer）
+    Au->>Ctrl: 放行
+    Ctrl->>Vd: scene('adminToggleStatus').check({id, status})
+    alt status 非 0/1（如被篡改为 5）
+        Vd-->>Ctrl: false
+        Ctrl-->>Api: {code:1001}（不做静默归一化）
+    else 通过
+        Vd-->>Ctrl: true
+        Ctrl->>Svc: toggleStatus(id, 0, currentAdminId)
+        Svc->>Svc: id == currentAdminId ？ / is_primary == 1 ？
+        alt 目标是当前登录账号
+            Svc-->>Ctrl: {code:1001, message:「不能停用当前登录账号」}
+        else 目标是主账号
+            Svc-->>Ctrl: {code:1001, message:「主账号不可停用」}
+        else 非自身且非主账号
+            Svc->>DB: BEGIN
+            Svc->>MU: 对目标行 SELECT … FOR UPDATE（lock(true)）
+            MU-->>Svc: 行（含 status）
+            alt 已是目标状态
+                Svc->>DB: COMMIT
+                Svc-->>Ctrl: {code:0}（幂等）
+            else 需变更
+                Svc->>MU: countEnabled()
+                alt 启用账号数 ≤ 1
+                    Svc->>DB: ROLLBACK
+                    Svc-->>Ctrl: {code:1001, message:「至少保留一个启用账号」}
+                else 变更
+                    Svc->>MU: setStatus(0)
+                    MU->>DB: UPDATE admin_user SET status=0
+                    Svc->>MS: revokeAll(id)（踢下线）
+                    MS->>DB: DELETE FROM admin_session WHERE admin_id=?
+                    Svc->>DB: COMMIT
+                    Svc-->>Ctrl: {code:0}
+                end
+            end
+        end
+        Ctrl-->>Api: 响应
+        Api-->>P: Toast + 刷新列表
+    end
+
+    Note over U,DB: 三、重置密码（一次性密码 + 强制改密 + 踢下线）
+    U->>P: 行内「重置密码」→ 二次确认
+    P->>Api: resetAdminPassword(id)
+    Api->>Au: POST {CMS_PATH}/api/admin/reset-password（Bearer）
+    Au->>Ctrl: 放行
+    Ctrl->>Svc: resetPassword(id, currentAdminId)
+    Svc->>Svc: id == currentAdminId ？
+    alt 目标是当前登录账号
+        Svc-->>Ctrl: {code:1001, message:「不能重置自己的密码」}
+    else 非自身
+        Svc->>Svc: random_strong_password(16)
+        Svc->>MU: resetPasswordTo(plain)（must_change_password=1）
+        MU->>DB: UPDATE admin_user SET password_hash=?, must_change_password=1
+        Svc->>MS: revokeAll(id)
+        MS->>DB: DELETE FROM admin_session WHERE admin_id=?
+        Svc-->>Ctrl: {code:0, data:{id, username, password}}
+        Ctrl-->>Api: 响应
+        Api-->>P: 弹「凭据面板」+「仅本次展示」
+    end
+
+    Note over U,DB: 四、删除（硬删，需手动输入账号名二次确认）
+    U->>P: 行内「删除」→ 弹窗输入目标账号名 → 确认
+    P->>P: 前端预校验：输入值 !== target.username → 阻止提交
+    P->>Api: deleteAdmin(id, username)
+    Api->>Au: POST {CMS_PATH}/api/admin/delete（Bearer）
+    Au->>Ctrl: 放行
+    Ctrl->>Vd: scene('adminDelete').check({id, confirm_username})
+    alt confirm_username 为空/超长
+        Vd-->>Ctrl: false
+        Ctrl-->>Api: {code:1001}
+    else 通过（注意：仅非空+长度，不套账号名格式）
+        Vd-->>Ctrl: true
+        Ctrl->>Svc: remove(id, username, currentAdminId)
+        Svc->>MU: find(id)
+        alt 目标不存在
+            Svc-->>Ctrl: {code:4004, message:「账号不存在」}
+        else 存在
+            Svc->>Svc: id == currentAdminId ？
+            alt 目标是当前登录账号
+                Svc-->>Ctrl: {code:1001, message:「不能删除当前登录账号」}
+            else hash_equals(user.username, username) ？
+                alt 不一致
+                    Svc-->>Ctrl: {code:1001, message:「账号名不一致」}
+                else 一致
+                    alt 目标是主账号（is_primary = 1）
+                        Svc-->>Ctrl: {code:1001, message:「主账号不可删除」}
+                    else 非主账号
+                        Svc->>DB: BEGIN + 行锁 lock(true)
+                        Svc->>MU: countEnabled()（若目标为启用中）
+                        alt 会导致启用账号清零
+                            Svc->>DB: ROLLBACK
+                            Svc-->>Ctrl: {code:1001, message:「至少保留一个启用账号」}
+                        else
+                            Svc->>MS: revokeAll(id)
+                            Svc->>MU: delete()
+                            MU->>DB: DELETE FROM admin_user WHERE id=?
+                            Svc->>DB: COMMIT
+                            Svc-->>Ctrl: {code:0}
+                        end
+                    end
+                end
+            end
+        end
+        Ctrl-->>Api: 响应
+        Api-->>P: Toast「已删除」+ 刷新列表
+    end

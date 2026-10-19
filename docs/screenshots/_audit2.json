@@ -1,0 +1,193 @@
+{
+  "news-grid@pc1440": {
+    "cardCount": 4,
+    "perRow": 3
+  },
+  "news-grid@tablet768": {
+    "cardCount": 4,
+    "perRow": 2
+  },
+  "news-grid@mobile375": {
+    "cardCount": 4,
+    "perRow": 1
+  },
+  "stickyNav": {
+    "headerPositionBefore": "sticky",
+    "afterScroll": {
+      "position": "sticky",
+      "top": 0,
+      "stillVisible": true
+    }
+  },
+  "contactFormMobile": [
+    {
+      "tag": "button",
+      "type": "button",
+      "name": "",
+      "w": 40,
+      "h": 40,
+      "right": 351,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "name",
+      "w": 277,
+      "h": 53,
+      "right": 326,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "input",
+      "type": "text",
+      "name": "company",
+      "w": 277,
+      "h": 53,
+      "right": 326,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "input",
+      "type": "tel",
+      "name": "phone",
+      "w": 277,
+      "h": 53,
+      "right": 326,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "input",
+      "type": "email",
+      "name": "email",
+      "w": 277,
+      "h": 53,
+      "right": 326,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "textarea",
+      "type": "",
+      "name": "content",
+      "w": 277,
+      "h": 162,
+      "right": 326,
+      "overflowsViewport": false
+    },
+    {
+      "tag": "button",
+      "type": "submit",
+      "name": "",
+      "w": 277,
+      "h": 59,
+      "right": 326,
+      "overflowsViewport": false
+    }
+  ],
+  "overlapScan": {
+    "/": {
+      "hScroll": false,
+      "overflowPx": 0,
+      "textOverflow": []
+    },
+    "/about": {
+      "hScroll": true,
+      "overflowPx": 8,
+      "textOverflow": [
+        {
+          "tag": "li",
+          "cls": "relative flex flex-col md:flex-row md:items-center md:justif",
+          "sw": 359,
+          "cw": 327
+        },
+        {
+          "tag": "li",
+          "cls": "relative flex flex-col md:flex-row md:items-center md:justif",
+          "sw": 359,
+          "cw": 327
+        },
+        {
+          "tag": "li",
+          "cls": "relative flex flex-col md:flex-row md:items-center md:justif",
+          "sw": 359,
+          "cw": 327
+        },
+        {
+          "tag": "li",
+          "cls": "relative flex flex-col md:flex-row md:items-center md:justif",
+          "sw": 359,
+          "cw": 327
+        },
+        {
+          "tag": "li",
+          "cls": "relative flex flex-col md:flex-row md:items-center md:justif",
+          "sw": 359,
+          "cw": 327
+        }
+      ]
+    },
+    "/products": {
+      "hScroll": false,
+      "overflowPx": 0,
+      "textOverflow": []
+    },
+    "/news": {
+      "hScroll": false,
+      "overflowPx": 0,
+      "textOverflow": []
+    },
+    "/contact": {
+      "hScroll": false,
+      "overflowPx": 0,
+      "textOverflow": []
+    }
+  },
+  "formFields": [
+    {
+      "name": "name",
+      "type": "text",
+      "placeholder": "请输入您的姓名"
+    },
+    {
+      "name": "company",
+      "type": "text",
+      "placeholder": "请输入公司名称（选填）"
+    },
+    {
+      "name": "phone",
+      "type": "tel",
+      "placeholder": "手机号或座机"
+    },
+    {
+      "name": "email",
+      "type": "email",
+      "placeholder": "name@example.com"
+    },
+    {
+      "name": "content",
+      "type": "textarea",
+      "placeholder": "请简要描述您的需求（5~500 字）"
+    }
+  ],
+  "validationFail": {
+    "hasToast": true,
+    "snippets": [
+      "请填写电话或邮箱",
+      "请填写电话或邮箱",
+      "电话与邮箱至少填写一项"
+    ]
+  },
+  "validationPass": {
+    "snippets": [
+      "提交成功，我们会尽快与您联系"
+    ],
+    "fieldsAfter": [
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "formCleared": true
+  }
+}

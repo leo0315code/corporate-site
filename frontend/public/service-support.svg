@@ -1,0 +1,13 @@
+<svg width="800" height="500" viewBox="0 0 800 500" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="运维保障服务（占位图）">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173DA8"/><stop offset="1" stop-color="#0F1B33"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#g)"/>
+  <circle cx="640" cy="110" r="150" fill="#FFFFFF" opacity="0.10"/>
+  <circle cx="120" cy="420" r="120" fill="#FFFFFF" opacity="0.08"/>
+  <rect x="300" y="150" width="200" height="200" rx="28" fill="#FFFFFF" opacity="0.12"/>
+  <path d="M360 300l40-64 40 64H360z" fill="#FFFFFF" opacity="0.85"/>
+  <text x="400" y="410" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" font-weight="600" fill="#FFFFFF" opacity="0.95">运维保障服务</text>
+</svg>

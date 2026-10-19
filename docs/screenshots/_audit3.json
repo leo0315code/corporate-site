@@ -1,0 +1,169 @@
+{
+  "generatedAt": "2026-10-16T08:27:20.733Z",
+  "grid": {
+    "home@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 1
+    },
+    "about@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "products@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "product-detail@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news-detail@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "contact@pc1440": {
+      "scrollW": 1440,
+      "clientW": 1440,
+      "diff": 0,
+      "enemies": 0
+    },
+    "home@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 2
+    },
+    "about@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "products@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "product-detail@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news-detail@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "contact@tablet768": {
+      "scrollW": 768,
+      "clientW": 768,
+      "diff": 0,
+      "enemies": 0
+    },
+    "home@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 2
+    },
+    "about@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    },
+    "products@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    },
+    "product-detail@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    },
+    "news-detail@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    },
+    "contact@mobile375": {
+      "scrollW": 375,
+      "clientW": 375,
+      "diff": 0,
+      "enemies": 0
+    }
+  },
+  "worst": {
+    "scrollW": 1440,
+    "clientW": 1440,
+    "diff": 0,
+    "enemies": 1,
+    "page": "home",
+    "vp": "pc1440"
+  },
+  "timeline": {
+    "itemCount": 7,
+    "containerWidth": 327,
+    "divWidth": 295,
+    "divLeft": 56,
+    "maxRight": 351,
+    "withinViewport": true,
+    "dots": [
+      {
+        "left": 60,
+        "right": 66,
+        "w": 6,
+        "w2": 3
+      },
+      {
+        "left": 74,
+        "right": 130,
+        "w": 56,
+        "w2": 28
+      },
+      {
+        "left": 24,
+        "right": 40,
+        "w": 16,
+        "w2": 8
+      }
+    ],
+    "docScrollW": 375,
+    "docClientW": 375
+  }
+}

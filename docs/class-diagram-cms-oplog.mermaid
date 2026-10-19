@@ -1,0 +1,115 @@
+%% ============================================================
+%% 操作日志模块（C-P1-3）类图
+%% 与 docs/ARCHITECTURE-CMS-OPLOG.md 第九节一致
+%% ============================================================
+classDiagram
+    %% ===== 新增：操作日志域 =====
+    class OpLog {
+        +int id
+        +int admin_id
+        +string admin_name
+        +string created_at
+        +string module
+        +string action
+        +string target
+        +string target_name
+        +string ip
+        +string user_agent
+        +int result
+        +string detail
+        +toLogItem() array
+    }
+    class OpLogContext {
+        +int adminId
+        +string adminName
+        +string ip
+        +string userAgent
+        +fromRequest(request) OpLogContext
+        +system() OpLogContext
+        +forLoginAttempt(username, ip, ua) OpLogContext
+    }
+    class OpLogService {
+        +record(module, action, result, detail, target, targetName, ctx) void
+        +list(page, size, module, adminName, result, keyword, startDate, endDate) ApiResponse
+        +detail(id) ApiResponse
+        -ALLOWED_FIELDS string[]
+        -buildRow(...) array
+        +MODULES string[]
+        +ACTIONS string[]
+    }
+    class OpLogItem {
+        +int id
+        +int admin_id
+        +string admin_name
+        +string created_at
+        +string module
+        +string action
+        +string target
+        +string target_name
+        +string ip
+        +string user_agent
+        +int result
+        +string detail
+    }
+    class OpLogController {
+        +list(request) ApiResponse
+        +detail(request) ApiResponse
+    }
+    class OpLogCleanCommand {
+        +configure() void
+        +execute(input, output) int
+    }
+
+    %% ===== 已有（本次改动：新增 ctx 参数 / 调用 record） =====
+    class AdminAuth {
+        +handle(request, next) Response
+    }
+    class AuthService {
+        +login(username, password, ip, ua) Response
+        +logout(token, ctx) Response
+        +changePassword(admin, old, new, confirm, ctx) Response
+        +resetPassword(admin, new, confirm, ctx) Response
+    }
+    class ContentService {
+        +save(type, data, ctx) Response
+        +remove(type, id, ctx) Response
+        +saveAbout(data, ctx) Response
+        +saveSiteConfig(data, ctx) Response
+    }
+    class MessageService {
+        +markStatus(id, status, ctx) Response
+        +remove(id, ctx) Response
+    }
+    class UploadService {
+        +image(file, type, ctx) Response
+    }
+    class AdminService {
+        +create(username, ctx) Response
+        +toggleStatus(id, status, ctx) Response
+        +resetPassword(id, ctx) Response
+        +remove(id, username, ctx) Response
+    }
+    class AdminUser {
+        +int id
+        +string username
+    }
+
+    %% ===== 关系 =====
+    AdminAuth ..> OpLogContext : 采集并注入 request
+    OpLogController --> OpLogService : list / detail
+    AuthService --> OpLogService : record
+    ContentService --> OpLogService : record
+    MessageService --> OpLogService : record
+    UploadService --> OpLogService : record
+    AdminService --> OpLogService : record
+    AuthService --> OpLogContext : login 自建 / changePassword·resetPassword 接收 ctx
+    ContentService ..> OpLogContext : 接收 ctx
+    MessageService ..> OpLogContext : 接收 ctx
+    UploadService ..> OpLogContext : 接收 ctx
+    AdminService ..> OpLogContext : 接收 ctx（含操作人 + ip + ua）
+    OpLogService ..> OpLog : 写入（create）
+    OpLogService ..> OpLogContext : 读取操作人/来源
+    OpLogController ..> OpLogItem : 列表/详情项
+    OpLogService ..> OpLogItem : toLogItem()
+    OpLogCleanCommand --> OpLog : 分批 DELETE
+    AdminAuth ..> AdminUser : 注入（已有）

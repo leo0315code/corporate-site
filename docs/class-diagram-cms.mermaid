@@ -1,0 +1,238 @@
+classDiagram
+    %% ===== 认证域 =====
+    class AdminUser {
+        +int id
+        +string username
+        +string password_hash
+        +bool must_change_password
+        +int status
+        +int is_primary
+        +string last_login_at
+        +string last_login_ip
+        +verifyPassword(plain) bool
+        +changePassword(plain) void
+        +isPrimary() bool
+        +countPrimary() int
+        +markAsPrimary() void
+    }
+    class AdminSession {
+        +int id
+        +int admin_id
+        +string token
+        +string expires_at
+        +findValid(token) AdminSession
+        +issue(adminId, token, ttlSeconds, ip, ua) AdminSession
+        +revoke(token) void
+        +revokeAll(adminId) void
+    }
+    class LoginAttempt {
+        +int id
+        +string scope
+        +string scope_key
+        +int fail_count
+        +string locked_until
+        +checkLocked(scope, key) int
+        +recordFail(scope, key, max, lockSeconds) int
+        +reset(scope, key) void
+    }
+    class AuthService {
+        +login(username, password, ip, ua) ApiResponse
+        +logout(token) ApiResponse
+        +resetPassword(admin, newPassword) ApiResponse
+        +changePassword(admin, token, oldPassword, newPassword) ApiResponse
+        +profile(admin) ApiResponse
+    }
+    class AuthValidate {
+        +scene(name) AuthValidate
+        +check(data) bool
+        +getError() string
+    }
+    class AdminAuth {
+        +handle(request, next) Response
+    }
+    class LoginThrottle {
+        +handle(request, next) Response
+    }
+
+    %% ===== 内容域 =====
+    class Product {
+        +string id
+        +string category
+        +string name
+        +string summary
+        +string description
+        +string[] features
+        +string image
+        +string icon
+    }
+    class NewsItem {
+        +string id
+        +string title
+        +string date
+        +string category
+        +string cover
+        +string summary
+        +string content
+    }
+    class CaseItem {
+        +string id
+        +string name
+        +string logo
+        +string desc
+    }
+    class AdvantageItem {
+        +int id
+        +string value
+        +string label
+        +string desc
+    }
+    class AboutData {
+        +string intro
+        +string vision
+        +string mission
+        +string[] values
+        +TimelineItem[] timeline
+        +Ability[] abilities
+    }
+    class TimelineItem {
+        +string year
+        +string title
+        +string desc
+    }
+    class Ability {
+        +string title
+        +string desc
+    }
+    class HomeSummary {
+        +Product[] products
+        +AdvantageItem[] advantages
+        +CaseItem[] cases
+        +NewsItem[] news
+    }
+    class SiteConfigData {
+        +string companyName
+        +string logo
+        +string slogan
+        +string description
+        +ContactData contact
+        +SiteConfigFooterData footer
+        +SeoData seo
+    }
+    class SiteConfigFooterData {
+        +string copyright
+        +string icp
+        +SocialLink[] socials
+    }
+    class ContentService {
+        +list(type, page, size, keyword, category, status) ApiResponse
+        +detail(type, id) ApiResponse
+        +save(type, data) ApiResponse
+        +remove(type, id) ApiResponse
+        +getAbout() ApiResponse
+        +saveAbout(data) ApiResponse
+        +getSiteConfig() ApiResponse
+        +saveSiteConfig(data) ApiResponse
+    }
+    class HomeService {
+        +summary(productLimit, newsLimit) ApiResponse
+    }
+    class ContentValidate {
+        +scene(name) ContentValidate
+        +check(data) bool
+        +getError() string
+    }
+    class PagedData_T_ {
+        +int total
+        +int page
+        +int size
+        +T[] items
+    }
+    class ApiResponse_T_ {
+        +int code
+        +string message
+        +T data
+    }
+
+    %% ===== 留言域（变更） =====
+    class MessageRecordAdmin {
+        +int id
+        +string name
+        +string company
+        +string phone
+        +string email
+        +string content
+        +string ip
+        +int status
+        +string handled_at
+        +string created_at
+    }
+    class MessageService {
+        +submit(payload, ip) ApiResponse
+        +getList(page, size, keyword, status) ApiResponse
+        +markStatus(id, status) ApiResponse
+        +remove(id) ApiResponse
+    }
+
+    %% ===== 账号管理域（C-P1-4 已交付，无 RBAC） =====
+    class AdminListItem {
+        +int id
+        +string username
+        +int status
+        +int must_change_password
+        +int is_primary
+        +string last_login_at
+        +string last_login_ip
+        +string created_at
+        +bool is_self
+    }
+    class AdminCredentialResult {
+        +int id
+        +string username
+        +string password
+    }
+    class AdminService {
+        +list(page, size, keyword, currentAdminId) ApiResponse
+        +create(username) ApiResponse
+        +toggleStatus(id, status, currentAdminId) ApiResponse
+        +resetPassword(id, currentAdminId) ApiResponse
+        +remove(id, username, currentAdminId) ApiResponse
+    }
+    class AdminValidate {
+        +scene(name) AdminValidate
+        +check(data) bool
+        +getError() string
+    }
+
+    AdminUser "1" --> "*" AdminSession : 拥有
+    LoginAttempt ..> AuthService : 被使用
+    AuthService --> AdminUser
+    AuthService --> AdminSession
+    AuthService --> LoginAttempt
+    AuthService --> AuthValidate
+    AdminService --> AdminUser : 增删改查
+    AdminService --> AdminSession : revokeAll 踢下线
+    AdminService --> AdminValidate
+    AdminService ..> AdminListItem : 列表项
+    AdminService ..> AdminCredentialResult : 一次性密码
+    AdminService ..> ApiResponse_T_
+    AdminService ..> PagedData_T_
+    AdminAuth ..> AdminSession : 校验
+    AdminAuth ..> AdminUser : 注入
+    ContentService ..> Product : 操作
+    ContentService ..> NewsItem : 操作
+    ContentService ..> CaseItem : 操作
+    ContentService ..> AdvantageItem : 操作
+    ContentService ..> AboutData : 操作
+    ContentService ..> SiteConfigData : 操作
+    ContentService --> ContentValidate
+    HomeService --> ContentService : 聚合
+    HomeSummary --> Product
+    HomeSummary --> AdvantageItem
+    HomeSummary --> CaseItem
+    HomeSummary --> NewsItem
+    AboutData --> TimelineItem
+    AboutData --> Ability
+    SiteConfigData --> SiteConfigFooterData
+    ContentService ..> ApiResponse_T_
+    AuthService ..> ApiResponse_T_
+    ContentService ..> PagedData_T_

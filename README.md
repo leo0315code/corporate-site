@@ -1,0 +1,316 @@
+# corporate-site（通用企业官网 + CMS 内容管理后台）
+
+> 一套**通用、可复用、可配置**的企业官网模板。前端 Vite + React 18 + React Router v6 + Tailwind CSS，后端 ThinkPHP 8 + MySQL 8。  
+> 全站内容由**站点配置 + 数据文件**驱动，换企业只需修改配置文件，**无需改动页面代码**。
+>
+> **本版本新增 CMS 内容管理后台**：在同一 SPA 工程内、以**独立可配置路由前缀**提供后台，
+> 在线维护产品 / 新闻 / 案例 / 优势 / 关于我们 5 类内容并查看留言；前台页面由「静态 import」
+> 改为「API 动态读取」，**后台改完刷新前台即生效**，接口失败自动降级到 `src/data/*.ts` 兜底。
+> 后台详细使用说明见 **[`docs/CMS-USAGE.md`](docs/CMS-USAGE.md)**。
+
+---
+
+## 一、目录结构
+
+```
+aicode/
+├── README.md                     # 本文件
+├── docs/                         # 设计文档
+│   ├── PRD.md                    # 产品需求文档
+│   ├── ARCHITECTURE.md           # 系统架构设计与任务分解
+│   ├── PRD-CMS.md                # CMS 后台增量 PRD
+│   ├── ARCHITECTURE-CMS.md       # CMS 后台增量架构设计 + 任务分解
+│   ├── CMS-USAGE.md              # ★ CMS 后台使用说明（登录/各模块/路径配置/初始化/FAQ）
+│   ├── class-diagram.mermaid     # 数据结构与接口类图
+│   └── sequence-diagram.mermaid  # 留言提交时序图
+├── frontend/                     # 前端工程（Vite + React + TS + Tailwind）
+│   ├── index.html
+│   ├── package.json
+│   ├── .env.development / .env.production  # ★ VITE_API_BASE / VITE_CMS_PATH（后台路径）
+│   ├── vite.config.ts            # React 插件 + /api 与 {CMS_PATH}/api 代理到 8000
+│   ├── tailwind.config.js        # 设计 token 固化（颜色/字体/圆角/断点）
+│   ├── postcss.config.js
+│   ├── tsconfig.json / tsconfig.node.json
+│   ├── public/                   # Logo / 占位图 / 地图占位（可直接替换）
+│   └── src/
+│       ├── config/site.config.ts # ★ 站点配置（公司/导航/联系/页脚/SEO）
+│       ├── data/                 # ★ 内容数据（products/news/about/advantages/cases，兼作降级兜底）
+│       ├── types/index.ts        # 全站类型定义
+│       ├── constants/index.ts    # 路由常量 ROUTES / CMS_ROUTES + 文案 MESSAGES + 错误码
+│       ├── components/           # 通用组件 + Navbar/Footer/MessageForm + cms/*
+│       ├── layouts/              # MainLayout + ScrollToTop + CmsLayout（后台壳）
+│       ├── sections/             # 首页 6 大区块（数据经 props 下发）
+│       ├── hooks/useContent.ts   # ★ 前台内容读取 Hook（加载/错误/降级/重试）
+│       ├── pages/                # 页面（前台 5 页 + pages/cms/* 后台页）
+│       ├── router.tsx            # 路由表（按 CMS.PATH 条件注册后台路由）
+│       ├── services/api.ts       # 公共 API 封装（超时/错误归一化/内容缓存）
+│       ├── services/cms.ts       # ★ 后台管理 API 客户端（Token 注入/错误码分流）
+│       └── utils/validate.ts     # 前端校验工具
+└── backend/                      # 后端工程（ThinkPHP 8 + MySQL 8）
+    ├── composer.json
+    ├── .example.env              # 环境变量示例（复制为 .env；含 CMS_PATH）
+    ├── think                     # TP 命令行入口
+    ├── public/index.php          # 应用入口
+    ├── database/cms.sql          # ★ CMS 建表脚本（8 张表 + message 加列）
+    ├── database/seed/cms-seed.json # ★ 迁移种子（源自 frontend/src/data/*.ts）
+    ├── config/                   # 配置（database / app / middleware / cms ...）
+    ├── route/app.php             # 路由：公共 /api/*（匿名）+ {CMS_PATH}/api/*（鉴权）
+    └── app/
+        ├── common.php            # success() / fail() 统一响应 + cms_path()
+        ├── middleware/           # Cors / AdminAuth / LoginThrottle / ContentCache
+        ├── controller/           # Auth / Content / Home / Message / PublicContent
+        ├── service/              # AuthService / ContentService / HomeService / MessageService
+        ├── model/                # AdminUser/AdminSession/LoginAttempt/Product/News/... /Message
+        ├── validate/             # AuthValidate / ContentValidate / MessageValidate
+        └── command/CmsInit.php   # ★ php think cms:init（建表 + 迁移 + 建管理员）
+```
+
+---
+
+## 二、环境要求
+
+| 组件       | 版本                | 说明                              |
+| -------- | ----------------- | ------------------------------- |
+| Node.js  | ≥ 18              | 前端构建                            |
+| PHP      | ≥ 8.0（推荐 8.1/8.2） | 后端运行，需开启 `pdo_mysql`、`mbstring` |
+| Composer | ≥ 2.x             | 安装 PHP 依赖                       |
+| MySQL    | 8.0               | 可用 ServBay 自带，默认账号 `root/root`  |
+| Nginx    | 生产部署              | 同域反代 `/api` 与 `{CMS_PATH}/api`（见六） |
+
+---
+
+## 三、快速开始
+
+### 3.1 后端（先启动）
+
+```bash
+cd backend
+
+# 1) 安装依赖
+composer install
+
+# 2) 准备环境变量：复制示例文件
+#    Windows:  copy .example.env .env
+#    macOS/Linux:  cp .example.env .env
+#    按需修改数据库连接（默认 root/root，库名 corporate_site）
+#    并设置后台路径 CMS_PATH（示例：CMS_PATH=/manage-x7k2；留空=后台关闭）
+
+# 3) 建库建表 + 迁移内容 + 创建管理员（幂等，可重复执行）
+#    会打印后台初始账号与随机强密码（首次），以及导入统计 8/7/6/4/1
+php think cms:init
+
+# 4) 启动服务（默认 http://localhost:8000）
+php think run
+```
+
+> 自检：浏览器访问 `http://localhost:8000/` 应返回 `{"code":0,"message":"ok","data":{"service":"corporate-site-api","status":"running"}}`。
+> `cms:init` 说明见 [`docs/CMS-USAGE.md`](docs/CMS-USAGE.md) 第二节。
+
+### 3.2 前端
+
+```bash
+cd frontend
+
+# 1) 安装依赖
+npm install
+
+# 2) 配置后台路径（须与后端 CMS_PATH 完全一致；未配置=后台关闭）
+#    在 .env.development / .env.production 中设置 VITE_CMS_PATH，例如：
+#    VITE_CMS_PATH=/manage-x7k2
+
+# 3) 启动开发服务器（默认 http://localhost:5173）
+npm run dev
+```
+
+> 开发期前端 `5173`，后端 `8000`，Vite 已配置 `proxy` 把 `/api` 与 `{VITE_CMS_PATH}/api`
+> 转发到 `http://localhost:8000`（见 `vite.config.ts`），**无需处理跨域**。
+> 后台入口：`http://localhost:5173{你的 VITE_CMS_PATH}`（如 `/manage-x7k2`）。
+
+### 3.3 生产构建
+
+```bash
+cd frontend
+npm run build        # 产物输出到 frontend/dist
+```
+
+---
+
+## 四、如何换成另一家企业的官网（重点）
+
+> 只改 **配置文件 + 数据文件**，不改任何组件代码。
+
+| 要替换的内容                                      | 修改文件                                            | 说明                                  |
+| ------------------------------------------- | ----------------------------------------------- | ----------------------------------- |
+| 公司名 / Logo / 标语 / 简介 / 导航 / 联系方式 / 页脚 / SEO | `frontend/src/config/site.config.ts`            | 全站统一入口（**站点级，仍走配置文件**）           |
+| 品牌主色                                        | `frontend/tailwind.config.js`（`colors.primary`） | 同步 `site.config.ts` 的 `theme`（用于展示） |
+| 产品 / 服务                                     | `frontend/src/data/products.ts`                 | 迁移前的初始数据；**线上内容优先取后台**            |
+| 新闻                                          | `frontend/src/data/news.ts`                     | 同上                                  |
+| 关于我们 / 发展历程 / 价值观                           | `frontend/src/data/about.ts`                    | 同上                                  |
+| 首页数据优势                                      | `frontend/src/data/advantages.ts`               | 同上                                  |
+| 客户案例                                        | `frontend/src/data/cases.ts`                    | 同上                                  |
+| 图片（Logo/产品图/新闻封面/地图）                        | `frontend/public/`                              | 按文件名替换即可                            |
+
+> **内容类数据（产品/新闻/案例/优势/关于我们）已接入 CMS**：
+> 首次通过 `php think cms:init` 从上述 `data/*.ts` 迁移入库；此后线上内容以**数据库为准**
+> （后台在线维护）。`data/*.ts` 保留为**迁移数据源 + 前台接口失败时的降级兜底**，
+> 直接改它们不会影响线上展示（除非重新迁移或接口降级）。
+>
+> **站点级配置**（公司名 / 导航 / 联系方式 / SEO / 主题色）仍由
+> `site.config.ts` + `tailwind.config.js` 驱动，不属于 CMS 管理范围。
+
+**修改主色示例**（改为橙红 `#E4572E`）：
+
+```js
+// frontend/tailwind.config.js
+colors: {
+  primary: { DEFAULT: '#E4572E', dark: '#C14420', light: '#FDF0EB' },
+  ...
+}
+```
+
+```ts
+// frontend/src/config/site.config.ts
+theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
+```
+
+---
+
+## 五、CMS 内容管理后台
+
+同域、独立可配置路由前缀的在线后台，维护 5 类内容 + 查看留言。完整说明见
+[`docs/CMS-USAGE.md`](docs/CMS-USAGE.md)，此处仅列要点。
+
+### 5.1 能力一览
+
+| 模块 | 路径（`{P}` = 后台前缀） | 能力 |
+| --- | --- | --- |
+| 登录 / 改密 | `{P}/login`、`{P}/reset-password`、`{P}/password` | 登录（失败锁定 + 限流）、首次强制改密、常规改密 |
+| 概览 | `{P}/` | 后台首页 |
+| 产品管理 | `{P}/products` | 列表 + 搜索 + 分页；新增 / 编辑 / 删除 |
+| 新闻管理 | `{P}/news` | 同上 |
+| 案例管理 | `{P}/cases` | 同上 |
+| 优势管理 | `{P}/advantages` | 同上（**自增主键**，新增不填 id） |
+| 关于我们 | `{P}/about` | 单例整页分区编辑 + 保存（价值观 / 时间轴 / 能力资质可增删） |
+| 留言管理 | `{P}/messages` | 列表 + 关键词 + 状态筛选 + 分页；详情（含 IP）；标记待处理/已处理；删除 |
+
+### 5.2 关键约定
+
+- **后台前缀同值**：前端 `VITE_CMS_PATH` = 后端 `CMS_PATH`；未配置（空）→ 后台整体 404。
+- **鉴权**：除登录外，后台 API（`{P}/api/*`）均需 `Authorization: Bearer <token>`；
+  未登录 / Token 失效 → `1003` 跳登录；未改初始密码 → `1006` 跳改密页。
+- **刷新即生效**：后台保存 / 删除成功后前端清除内容缓存，前台刷新即见最新内容。
+- **降级兜底**：前台接口失败时回退 `frontend/src/data/*.ts`，不白屏；恢复后点「重新加载」。
+
+---
+
+## 六、接口说明
+
+统一响应格式：`{ "code": 0, "message": "ok", "data": null }`，`code = 0` 表示成功。
+
+### 6.1 前台公共接口（匿名只读 + 留言提交）
+
+| 方法 | 路径 | 用途 | 参数 |
+| --- | --- | --- | --- |
+| GET | `/api/product/list` | 产品列表 | `page,size,category,keyword` |
+| GET | `/api/product/detail` | 产品详情 | `id`（未命中 → 4004） |
+| GET | `/api/news/list` | 新闻列表 | `page,size,category,keyword` |
+| GET | `/api/news/detail` | 新闻详情（含上下篇） | `id`（未命中 → 4004） |
+| GET | `/api/case/list` | 案例列表（全量） | — |
+| GET | `/api/advantage/list` | 优势列表（全量，含 id） | — |
+| GET | `/api/about/detail` | 关于我们（单例） | — |
+| GET | `/api/home/summary` | 首页聚合 | `productLimit,newsLimit` |
+| POST | `/api/message` | 提交留言 | `name,company,phone,email,content` |
+
+### 6.2 后台管理接口（`{P}/api/*`，除 login 外均需 Bearer Token）
+
+`login / logout / profile / reset-password / password`、`content/{product,news,case,advantage}/{list,save,delete}`、
+`content/about/{detail,save}`、`message/{list,detail,status,delete}`。详见
+[`docs/CMS-USAGE.md`](docs/CMS-USAGE.md) 与 `docs/ARCHITECTURE-CMS.md` 3.4 节。
+
+### 6.3 错误码表
+
+| code | 含义 | 说明 |
+| ---- | ------------------------------------------------- | --- |
+| 0    | 成功 | — |
+| 1001 | 参数校验失败 | message 为具体字段错误 |
+| 1002 | 重复提交 | 幂等审计 |
+| 1003 | 未登录 / Token 无效或过期 | 前端清 Token 跳登录页 |
+| 1004 | 账号或密码错误 | 不区分账号/密码，防枚举 |
+| 1005 | 登录失败次数过多（已锁定） | message 含剩余时间 |
+| 1006 | 需要先修改初始密码 | 前端跳改密页 |
+| 1007 | 原密码错误 | 修改密码场景 |
+| 1008 | 请求过于频繁（限流） | 登录接口 |
+| 4004 | 资源不存在 | 含未配置后台路径时的 404 |
+| 5000 | 服务器内部异常 | — |
+
+---
+
+## 七、生产部署（Nginx 同域部署示例）
+
+前端 `npm run build` 产物放于 `frontend/dist`，后端 TP8 入口为 `backend/public/index.php`。
+Nginx 同域反代 `/api` 与 `{CMS_PATH}/api` 到后端，其余走前端静态产物：
+
+```nginx
+server {
+    listen 80;
+    server_name www.example.com;
+
+    root /var/www/corporate-site/frontend/dist;
+    index index.html;
+
+    # ===== 后台管理 API（须置于通用 SPA 回退之前）=====
+    # {CMS_PATH} 与实际配置一致，例如 /manage-x7k2
+    location /manage-x7k2/api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ===== 前台公共 API =====
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ===== 前台 SPA 路由回退（含 /products /news /about 等）=====
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 静态资源缓存
+    location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+> 要点：
+> - **只**把 `/api` 与 `{CMS_PATH}/api` 反代到后端；后台**页面路由**（如 `{CMS_PATH}/login`）
+>   由前端 SPA 处理，通用 `location /` 的 SPA 回退已覆盖，**无需**为后台单独配置回退。
+> - 若确需为后台前缀单独加 SPA 回退，务必使其**位于 `{CMS_PATH}/api` 反代规则之后**。
+> - Windows + ServBay 环境同样适用：`root` 指向 `dist`，反代指向 `php think run` 或 php-cgi 的 8000 端口。
+
+---
+
+## 八、常见问题
+
+1. **前端请求 404 / 跨域？**  
+   确认后端已启动在 `8000`；开发期依赖 Vite proxy（`vite.config.ts` 的 `server.proxy`）。
+2. **留言提交 / 后台 500，数据库错误？**  
+   确认已执行 `php think cms:init`（建表 + 迁移），且 `.env` 中数据库名/账号密码正确。
+3. **后台地址 404？**  
+   确认前后端 `VITE_CMS_PATH` / `CMS_PATH` 已配置且**完全一致**，并已重启前后端服务。
+4. **`php think run` 端口被占用？**  
+   使用 `php think run -p 8001` 并同步修改 `frontend/vite.config.ts` 的 proxy 目标。
+5. **不装 MySQL 想快速体验？**  
+   `backend/.env` 设 `TYPE = sqlite`，并准备 sqlite 驱动与库文件（备选方案）。
+
+---
+
+*交付物：前端工程 + 后端工程 + CMS 内容管理后台 + 配置/数据文件 + 使用说明与部署示例。*

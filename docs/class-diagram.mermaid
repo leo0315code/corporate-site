@@ -1,0 +1,148 @@
+classDiagram
+    class SiteConfig {
+        +string companyName
+        +string logo
+        +string slogan
+        +string description
+        +NavItem[] nav
+        +ContactInfo contact
+        +FooterConfig footer
+        +ThemeConfig theme
+        +SeoConfig seo
+    }
+    class NavItem {
+        +string label
+        +string path
+    }
+    class ContactInfo {
+        +string phone
+        +string email
+        +string address
+        +string workTime
+        +string mapImage
+    }
+    class FooterConfig {
+        +string copyright
+        +string icp
+        +QuickLink[] quickLinks
+        +SocialLink[] socials
+    }
+    class QuickLink {
+        +string label
+        +string path
+    }
+    class SocialLink {
+        +string label
+        +string url
+        +string icon
+    }
+    class ThemeConfig {
+        +string primary
+        +string secondary
+        +string accent
+    }
+    class SeoConfig {
+        +string title
+        +string description
+        +string keywords
+    }
+    class Product {
+        +string id
+        +string category
+        +string name
+        +string summary
+        +string description
+        +string[] features
+        +string image
+        +string icon
+    }
+    class NewsItem {
+        +string id
+        +string title
+        +string date
+        +string category
+        +string cover
+        +string summary
+        +string content
+    }
+    class AboutData {
+        +string intro
+        +string vision
+        +string mission
+        +string[] values
+        +TimelineItem[] timeline
+        +Ability[] abilities
+    }
+    class TimelineItem {
+        +string year
+        +string title
+        +string desc
+    }
+    class Ability {
+        +string title
+        +string desc
+    }
+    class Advantage {
+        +string value
+        +string label
+        +string desc
+    }
+    class CaseItem {
+        +string id
+        +string name
+        +string logo
+        +string desc
+    }
+    class MessagePayload {
+        +string name
+        +string company
+        +string phone
+        +string email
+        +string content
+    }
+    class ApiResponse~T~ {
+        +number code
+        +string message
+        +T data
+    }
+    class MessageController {
+        +submit() Response
+        +list() Response
+    }
+    class MessageService {
+        +submit(MessagePayload) ApiResponse
+        +getList(int page, int size) ApiResponse
+    }
+    class MessageModel {
+        +int id
+        +string name
+        +string company
+        +string phone
+        +string email
+        +string content
+        +string ip
+        +string createdAt
+        +findDuplicate(ip, content) Message
+        +createMessage(data) Message
+    }
+    class MessageValidate {
+        +array rule
+        +array message
+        +scene(string name) MessageValidate
+        +check(data) bool
+        +getError() string
+    }
+    SiteConfig --> NavItem
+    SiteConfig --> ContactInfo
+    SiteConfig --> FooterConfig
+    SiteConfig --> ThemeConfig
+    SiteConfig --> SeoConfig
+    FooterConfig --> QuickLink
+    FooterConfig --> SocialLink
+    AboutData --> TimelineItem
+    AboutData --> Ability
+    MessageController --> MessageService
+    MessageService --> MessageModel
+    MessageService --> MessageValidate
+    MessageController ..> ApiResponse
+    MessageService ..> ApiResponse
