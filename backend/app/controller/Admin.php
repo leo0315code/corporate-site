@@ -67,9 +67,12 @@ class Admin
     }
 
     /**
-     * 新建账号（POST {P}/api/admin/create，body: username）
+     * 新建账号（POST {P}/api/admin/create，body: username + role）
      *
+     * `role` 必须显式指定（admin|editor|viewer），服务端不做静默兜底——
+     * 悄悄建成「有写权限的账号」比报错更危险。
      * 成功返回的 `password` 为服务端生成的随机强密码，**仅此一次返回**。
+     *
      * @param Request $request
      * @return Response
      */
@@ -77,7 +80,30 @@ class Admin
     {
         $payload = $this->payload($request);
 
-        return $this->service->create($this->pick($payload, ['username']), $this->logContext($request));
+        return $this->service->create(
+            $this->pick($payload, ['username']),
+            $this->pick($payload, ['role']),
+            $this->logContext($request)
+        );
+    }
+
+    /**
+     * 调整账号角色（POST {P}/api/admin/change-role，body: id + role）
+     *
+     * 守卫（不得改自己 / 主账号不得降级 / 至少保留 1 个超管）全部在服务层裁决。
+     *
+     * @param Request $request
+     * @return Response
+     */
+    public function changeRole(Request $request): Response
+    {
+        $payload = $this->payload($request);
+
+        return $this->service->changeRole(
+            (int) ($payload['id'] ?? 0),
+            (string) ($payload['role'] ?? ''),
+            $this->logContext($request)
+        );
     }
 
     /**

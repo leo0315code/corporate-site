@@ -11,11 +11,12 @@ use think\facade\Log;
 use think\Response;
 
 /**
- * 后台账号管理服务（账号管理，**不含 RBAC**）
+ * 后台账号管理服务
  *
  * 职责（P1 前置能力，见 PRD C-P1-4「多管理员」）：
- * - `list()`         ：账号列表（分页 + 账号名关键词），并标注当前登录者；
- * - `create()`       ：新建账号（服务端生成随机强密码，**仅本次返回**）；
+ * - `list()`         ：账号列表（分页 + 账号名关键词），并标注当前登录者与角色；
+ * - `create()`       ：新建账号（指定角色 + 服务端生成随机强密码，**仅本次返回**）；
+ * - `changeRole()`   ：调整角色（含「不得改自己 / 主账号不得降级 / 至少留 1 个超管」守卫）；
  * - `toggleStatus()` ：启用 / 停用（停用后立即踢下线）；
  * - `resetPassword()`：为他人重置密码（随机强密码 + 强制首次改密 + 踢下线）；
  * - `remove()`       ：硬删除（需输入账号名二次确认）。
@@ -118,12 +119,20 @@ class AdminService
      * **绝不记录随机密码明文**。
      *
      * @param string       $username 登录账号
+     * @param string       $role     角色（admin|editor|viewer，非法值 → 1001）
      * @param OpLogContext $ctx      操作日志上下文（含操作人 + ip + ua）
-     * @return Response 成功时 data = { id, username, password }（password 仅此一次返回）
+     * @return Response 成功时 data = { id, username, role, password }（password 仅此一次返回）
      */
-    public function create(string $username, OpLogContext $ctx): Response
+    public function create(string $username, string $role, OpLogContext $ctx): Response
     {
         $username = trim($username);
+
+        // 角色必须是固定三角色之一；**不做静默兜底**，否则会悄悄建出非预期权限的账号
+        $roleInput = is_scalar($role) ? strtolower(trim((string) $role)) : '';
+        if (!in_array($roleInput, Rbac::ROLES, true)) {
+            OpLogService::record('account', 'create', 0, '新建失败：角色不合法', $username, $username, $ctx);
+            return fail(error_code()['VALIDATE_FAIL'], '角色不合法，请选择 超级管理员 / 内容编辑 / 只读运营');
+        }
 
         $validate = new AdminValidate();
         if (!$validate->scene('adminCreate')->check(['username' => $username])) {
@@ -139,16 +148,18 @@ class AdminService
             }
 
             $password = random_strong_password(self::PWD_LENGTH);
-            $user     = AdminUser::createAccount($username, $password);
+            $user     = AdminUser::createAccount($username, $password, $roleInput);
 
             // 审计日志：记录操作事实，**绝不记录密码明文**
-            Log::info(sprintf('[cms:admin] 新建账号 username=%s admin_id=%d', $username, $user->id));
+            Log::info(sprintf('[cms:admin] 新建账号 username=%s role=%s admin_id=%d', $username, $roleInput, $user->id));
 
-            OpLogService::record('account', 'create', 1, '新建账号 ' . $username . '（普通账号）', $username, $username, $ctx);
+            $roleLabel = (string) config('cms.role_labels.' . $roleInput, $roleInput);
+            OpLogService::record('account', 'create', 1, '新建账号 ' . $username . '（' . $roleLabel . '）', $username, $username, $ctx);
 
             return success([
                 'id'       => (int) $user->id,
                 'username' => (string) $user->username,
+                'role'     => $roleInput,
                 'password' => $password,
             ]);
         } catch (\Throwable $e) {
@@ -185,6 +196,85 @@ class AdminService
      * @param OpLogContext $ctx    操作日志上下文（含操作人 + ip + ua）
      * @return Response 统一响应结构
      */
+    /**
+     * 调整账号角色（固定三角色：admin / editor / viewer）
+     *
+     * 守卫（全部服务端裁决，前端置灰只是体验）：
+     * - 角色值必须合法（否则 1001，**不静默归一化**）；
+     * - 目标账号必须存在（否则 4004）；
+     * - **不得修改自己的角色**（防止把自己降权后无人可救）；
+     * - **主账号不得降级**（主账号是初始入口，降级等于把系统归属抹掉）；
+     * - 调整后必须仍有**至少 1 个启用状态的超级管理员**（否则 1001）。
+     *
+     * @param int          $id   目标账号 ID
+     * @param string       $role 新角色
+     * @param OpLogContext $ctx  操作日志上下文
+     * @return Response data = 更新后的账号列表项
+     */
+    public function changeRole(int $id, string $role, OpLogContext $ctx): Response
+    {
+        $roleInput = is_scalar($role) ? strtolower(trim((string) $role)) : '';
+        if (!in_array($roleInput, Rbac::ROLES, true)) {
+            OpLogService::record('account', 'update', 0, '改角色失败：角色不合法', (string) $id, '', $ctx);
+            return fail(error_code()['VALIDATE_FAIL'], '角色不合法，请选择 超级管理员 / 内容编辑 / 只读运营');
+        }
+
+        /** @var AdminUser|null $target */
+        $target = AdminUser::find($id);
+        if (!$target instanceof AdminUser) {
+            OpLogService::record('account', 'update', 0, '改角色失败：账号不存在', (string) $id, '', $ctx);
+            return fail(error_code()['NOT_FOUND'], '账号不存在');
+        }
+
+        if ((int) $target->id === (int) $ctx->adminId) {
+            OpLogService::record('account', 'update', 0, '改角色失败：不能修改自己', (string) $id, (string) $target->username, $ctx);
+            return fail(error_code()['VALIDATE_FAIL'], '不能修改自己的角色，请让其他管理员操作');
+        }
+
+        $currentRole = Rbac::roleOf($target->getData('role'));
+        if ($currentRole === $roleInput) {
+            // 幂等：无变化直接返回，不写噪声日志
+            return success($target->toAdminItem());
+        }
+
+        if ((int) $target->getData('is_primary') === 1 && $roleInput !== 'admin') {
+            OpLogService::record('account', 'update', 0, '改角色失败：主账号不可降级', (string) $id, (string) $target->username, $ctx);
+            return fail(error_code()['VALIDATE_FAIL'], '主账号必须保持「超级管理员」，不可降级');
+        }
+
+        try {
+            $remainingAdmins = AdminUser::where('role', 'admin')
+                ->where('status', 1)
+                ->where('id', '<>', $id)
+                ->count();
+
+            if ($roleInput !== 'admin' && $currentRole === 'admin' && (int) $remainingAdmins === 0) {
+                OpLogService::record('account', 'update', 0, '改角色失败：至少保留一个超级管理员', (string) $id, (string) $target->username, $ctx);
+                return fail(error_code()['VALIDATE_FAIL'], '系统至少需要保留一个启用状态的超级管理员');
+            }
+
+            $target->save(['role' => $roleInput]);
+
+            $fromLabel = (string) config('cms.role_labels.' . $currentRole, $currentRole);
+            $toLabel   = (string) config('cms.role_labels.' . $roleInput, $roleInput);
+            OpLogService::record(
+                'account',
+                'update',
+                1,
+                sprintf('角色：%s → %s', $fromLabel, $toLabel),
+                (string) $id,
+                (string) $target->username,
+                $ctx
+            );
+
+            return success($target->toAdminItem());
+        } catch (\Throwable $e) {
+            Log::error('[cms:admin] 改角色失败：' . $e->getMessage());
+            OpLogService::record('account', 'update', 0, '改角色异常', (string) $id, (string) $target->username, $ctx);
+            return fail(error_code()['SERVER_ERROR'], '服务器开小差了，请稍后重试');
+        }
+    }
+
     public function toggleStatus(int $id, int $status, OpLogContext $ctx): Response
     {
         $actorId = $ctx->adminId;

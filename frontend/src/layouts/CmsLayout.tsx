@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { CMS_ROUTES } from '@/constants';
+import { CMS_PATH_MODULE, CMS_ROLE_LABELS, CMS_ROUTES } from '@/constants';
+import type { CmsModule } from '@/constants';
+import { canRead } from '@/utils/permission';
 import { fetchProfile, logout as cmsLogout } from '@/services/cms';
 import { clearToken, handleAuthError } from '@/utils/authToken';
 import type { AdminProfile } from '@/types';
@@ -27,20 +29,22 @@ interface CmsNavItem {
   icon: NavIconName;
   /** 精确匹配（用于仪表盘根路径） */
   end?: boolean;
+  /** 所需 module（用于按角色过滤；缺省表示所有登录用户可见） */
+  module?: CmsModule;
 }
 
 /** 后台左栏导航配置 */
 const NAV_ITEMS: CmsNavItem[] = [
   { to: CMS_ROUTES.DASHBOARD, label: '仪表盘', icon: 'dashboard', end: true },
-  { to: CMS_ROUTES.PRODUCTS, label: '产品管理', icon: 'product' },
-  { to: CMS_ROUTES.NEWS, label: '新闻管理', icon: 'news' },
-  { to: CMS_ROUTES.CASES, label: '案例管理', icon: 'case' },
-  { to: CMS_ROUTES.ADVANTAGES, label: '优势管理', icon: 'advantage' },
-  { to: CMS_ROUTES.ABOUT, label: '关于我们', icon: 'about' },
-  { to: CMS_ROUTES.SITE, label: '网站配置', icon: 'site' },
-  { to: CMS_ROUTES.MESSAGES, label: '留言管理', icon: 'message' },
-  { to: CMS_ROUTES.ACCOUNTS, label: '账号管理', icon: 'account' },
-  { to: CMS_ROUTES.OPLOGS, label: '操作日志', icon: 'oplog' },
+  { to: CMS_ROUTES.PRODUCTS, label: '产品管理', icon: 'product', module: 'product' },
+  { to: CMS_ROUTES.NEWS, label: '新闻管理', icon: 'news', module: 'news' },
+  { to: CMS_ROUTES.CASES, label: '案例管理', icon: 'case', module: 'case' },
+  { to: CMS_ROUTES.ADVANTAGES, label: '优势管理', icon: 'advantage', module: 'advantage' },
+  { to: CMS_ROUTES.ABOUT, label: '关于我们', icon: 'about', module: 'about' },
+  { to: CMS_ROUTES.SITE, label: '网站配置', icon: 'site', module: 'site' },
+  { to: CMS_ROUTES.MESSAGES, label: '留言管理', icon: 'message', module: 'message' },
+  { to: CMS_ROUTES.ACCOUNTS, label: '账号管理', icon: 'account', module: 'account' },
+  { to: CMS_ROUTES.OPLOGS, label: '操作日志', icon: 'oplog', module: 'oplog' },
   { to: CMS_ROUTES.PASSWORD, label: '修改密码', icon: 'password' },
 ];
 
@@ -81,10 +85,17 @@ function NavIcon({ name }: { name: NavIconName }) {
  * 侧栏导航（桌面常驻 / 移动抽屉共用）
  * @param props.onNavigate 点击导航项后的回调（移动端用于关闭抽屉）
  */
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({
+  items,
+  onNavigate,
+}: {
+  /** 当前角色可见的导航项 */
+  items: CmsNavItem[];
+  onNavigate?: () => void;
+}) {
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-      {NAV_ITEMS.map((item) => (
+      {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -132,6 +143,22 @@ export default function CmsLayout() {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profile, setProfile] = useState<AdminProfile | null>(null);
+
+  /**
+   * 按角色过滤导航。
+   *
+   * 资料未加载时不渲染任何受管模块，避免「先闪出全部菜单再收起」；
+   * 加载失败时 permissions 为空，同样只显示仪表盘/改密这类通用入口。
+   */
+  const visibleNav = profile === null
+    ? NAV_ITEMS.filter((item) => item.module === undefined)
+    : NAV_ITEMS.filter((item) => item.module === undefined || canRead(profile.permissions, item.module));
+
+  /** 当前路径所需模块（无模块=不设限） */
+  const currentModule = CMS_PATH_MODULE[location.pathname];
+
+  /** 直接输入 URL 越权访问 → 渲染无权限页，避免页面发起必然 403 的请求 */
+  const forbidden = profile !== null && currentModule !== undefined && !canRead(profile.permissions, currentModule);
 
   // 当前页面标题：按前缀匹配导航项（仪表盘需精确匹配）
   const currentTitle =
@@ -186,7 +213,7 @@ export default function CmsLayout() {
       {/* 桌面端常驻侧栏 */}
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-white lg:flex">
         <SidebarBrand />
-        <SidebarNav />
+        <SidebarNav items={visibleNav} />
       </aside>
 
       {/* 移动端抽屉 */}
@@ -202,7 +229,7 @@ export default function CmsLayout() {
           {/* 抽屉面板 */}
           <div className="absolute left-0 top-0 flex h-full w-60 flex-col border-r border-border bg-white">
             <SidebarBrand />
-            <SidebarNav onNavigate={() => setDrawerOpen(false)} />
+            <SidebarNav items={visibleNav} onNavigate={() => setDrawerOpen(false)} />
           </div>
         </div>
       )}
@@ -235,6 +262,11 @@ export default function CmsLayout() {
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-text-secondary sm:inline">
               {profile ? profile.username : '加载中…'}
+              {profile && (
+                <span className="ml-2 rounded-full bg-bg-soft px-2 py-0.5 text-xs text-text-muted">
+                  {CMS_ROLE_LABELS[profile.role]}
+                </span>
+              )}
             </span>
             <Link
               to={CMS_ROUTES.PASSWORD}
@@ -254,7 +286,22 @@ export default function CmsLayout() {
 
         {/* 内容区（全宽，无居中容器） */}
         <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
-          <Outlet />
+          {forbidden ? (
+            <div className="rounded-card border border-border bg-white p-8 text-center">
+              <p className="text-base font-semibold text-text">当前角色无权访问该模块</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                你的角色是「{CMS_ROLE_LABELS[profile.role]}」，如需权限请联系超级管理员调整。
+              </p>
+              <Link
+                to={CMS_ROUTES.DASHBOARD}
+                className="mt-5 inline-block rounded-btn bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              >
+                返回仪表盘
+              </Link>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

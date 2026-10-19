@@ -43,7 +43,7 @@ Route::group('api', function () {
  * - 认证：{P}/api/{login,logout,profile,reset-password,password}
  * - 内容：{P}/api/content/{type}/{list|save|delete}
  * - 留言：{P}/api/message/{list,detail,status,delete}
- * - 账号：{P}/api/admin/{list,create,toggle-status,reset-password,delete}
+ * - 账号：{P}/api/admin/{list,create,change-role,toggle-status,reset-password,delete}
  */
 $cms = cms_path();
 
@@ -98,6 +98,7 @@ if ($cms !== '') {
             // 注意：本组 action **不在** AdminAuth::$pwdWhitelist 内 → 未改初始密码时返回 1006
             Route::get('admin/list',            'Admin/adminList');
             Route::post('admin/create',         'Admin/create');
+            Route::post('admin/change-role',    'Admin/changeRole');
             Route::post('admin/toggle-status',  'Admin/toggleStatus');
             Route::post('admin/reset-password', 'Admin/resetPassword');
             Route::post('admin/delete',         'Admin/delete');

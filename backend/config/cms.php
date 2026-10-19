@@ -27,4 +27,41 @@ return [
 
     // 操作日志保留天数（默认 180 天；清理命令 oplog:clean 未显式传 --days 时使用）
     'oplog_retain_days' => (int) env('OPLOG_RETAIN_DAYS', 180),
+
+    /*
+    |--------------------------------------------------------------------------
+    | 角色与权限（RBAC，固定三角色 + 模块级权限）
+    |--------------------------------------------------------------------------
+    | 取舍说明（2026-10 定稿）：
+    | - **固定三角色**：不支持后台自定义角色，避免「配出一个能改账号却看不懂日志」的角色；
+    | - **模块级权限**：每个模块只区分 `read` / `write`，不做「新增/编辑/删除」细分；
+    | - 角色能力用通配符表达：`*` 全权、`product.*` 该模块读写、`product.read` 只读。
+    |
+    | 权限点命名：`{module}.read` / `{module}.write`
+    | 模块清单：product / news / case / advantage / about / site / message / account / oplog / upload
+    */
+    'roles' => [
+        // 超级管理员：全部模块读写（含账号管理、操作日志）
+        'admin'  => ['*'],
+        // 内容编辑：内容 + 网站配置 + 留言 + 上传；**不含**账号管理与操作日志
+        'editor' => [
+            'product.*', 'news.*', 'case.*', 'advantage.*', 'about.*', 'site.*',
+            'message.*', 'upload.*',
+        ],
+        // 只读运营：可查看内容与留言，不能写
+        'viewer' => [
+            'product.read', 'news.read', 'case.read', 'advantage.read',
+            'about.read', 'site.read', 'message.read',
+        ],
+    ],
+
+    // 角色中文名（前端展示；新增角色须同步 frontend/src/constants/index.ts）
+    'role_labels' => [
+        'admin'  => '超级管理员',
+        'editor' => '内容编辑',
+        'viewer' => '只读运营',
+    ],
+
+    // 新账号默认角色（安全默认：给最小可用权限，由管理员按需提升）
+    'default_role' => 'viewer',
 ];

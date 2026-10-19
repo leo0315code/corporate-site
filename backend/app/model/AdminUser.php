@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace app\model;
 
+use app\service\Rbac;
 use think\Model;
 
 /**
@@ -18,6 +19,7 @@ use think\Model;
  * @property string      $password_hash
  * @property int         $must_change_password
  * @property int         $status
+ * @property string      $role
  * @property int         $is_primary
  * @property string|null $last_login_at
  * @property string      $last_login_ip
@@ -251,12 +253,13 @@ class AdminUser extends Model
      * @param string $plain    初始明文密码
      * @return AdminUser 已落库的管理员
      */
-    public static function createAccount(string $username, string $plain): AdminUser
+    public static function createAccount(string $username, string $plain, string $role = 'viewer'): AdminUser
     {
         /** @var AdminUser $user */
         $user = self::create([
             'username'             => $username,
             'password_hash'        => password_hash($plain, PASSWORD_BCRYPT),
+            'role'                 => Rbac::roleOf($role),
             'must_change_password' => 1,
             'status'               => 1,
             'is_primary'           => 0,
@@ -275,9 +278,13 @@ class AdminUser extends Model
      */
     public function toProfile(): array
     {
+        $role = Rbac::roleOf($this->getData('role'));
+
         return [
             'id'                   => (int) $this->id,
             'username'             => (string) $this->username,
+            'role'                 => $role,
+            'permissions'          => Rbac::permissionsOf($role),
             'must_change_password' => (int) $this->must_change_password === 1,
             'status'               => (int) $this->status,
             'last_login_at'        => $this->last_login_at,
@@ -304,6 +311,7 @@ class AdminUser extends Model
         return [
             'id'                   => (int) $this->id,
             'username'             => (string) $this->username,
+            'role'                 => Rbac::roleOf($this->getData('role')),
             'status'               => (int) $this->status,
             'must_change_password' => (int) $this->must_change_password,
             'is_primary'           => (int) $this->getData('is_primary'),

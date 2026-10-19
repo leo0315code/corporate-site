@@ -59,6 +59,7 @@ CREATE TABLE admin_user (
     must_change_password INTEGER NOT NULL DEFAULT 0,
     status INTEGER NOT NULL DEFAULT 1,
     is_primary INTEGER NOT NULL DEFAULT 0,
+    role TEXT NOT NULL DEFAULT 'admin',
     last_login_at TEXT NULL,
     last_login_ip TEXT NOT NULL DEFAULT '',
     created_at TEXT NULL,

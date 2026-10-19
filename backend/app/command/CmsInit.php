@@ -436,6 +436,7 @@ class CmsInit extends Command
             'must_change_password' => 1,
             'status'               => 1,
             'is_primary'           => 1,
+            'role'                 => 'admin',
         ]);
 
         // 双保险：即使上面因模型字段过滤未写入 is_primary，也确保主账号标记落库

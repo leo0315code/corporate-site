@@ -47,7 +47,7 @@ aicode/
 │       ├── router.tsx            # 路由表（按 CMS.PATH 条件注册后台路由）
 │       ├── services/api.ts       # 公共 API 封装（超时/错误归一化/内容缓存）
 │       ├── services/cms.ts       # ★ 后台管理 API 客户端（Token 注入/错误码分流）
-│       └── utils/validate.ts     # 前端校验工具
+│       ├── utils/                # validate（前端校验）+ permission（RBAC 菜单/按钮可见性）
 └── backend/                      # 后端工程（ThinkPHP 8 + MySQL 8）
     ├── composer.json
     ├── .example.env              # 环境变量示例（复制为 .env；含 CMS_PATH）
@@ -62,7 +62,7 @@ aicode/
         ├── common.php            # success() / fail() 统一响应 + cms_path()
         ├── middleware/           # Cors / AdminAuth / LoginThrottle / MessageThrottle / ContentCache
         ├── controller/           # Auth / Content / Home / Message / PublicContent / Admin / Upload / OpLog
-        ├── service/              # Auth / Content / Home / Message / Admin / Upload / OpLog(+Context)
+        ├── service/              # Auth / Content(+content/ 拆分) / Home / Message / Admin / Upload / OpLog(+Context) / Rbac
         ├── model/                # AdminUser/AdminSession/LoginAttempt/Product/News/.../SiteConfig/OpLog
         ├── validate/             # Auth / Content / Message / Admin 校验器
         └── command/              # cms:init / oplog:clean / session:clean / sitemap:gen
@@ -218,7 +218,7 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 | 关于我们 | `{P}/about` | 单例整页分区编辑 + 保存（价值观 / 时间轴 / 能力资质可增删） |
 | 网站配置 | `{P}/site` | 公司信息 / 联系方式 / 页脚 / 社交链接 / SEO 单例编辑（导航与主题色仍走前端配置） |
 | 留言管理 | `{P}/messages` | 列表 + 关键词 + 状态筛选 + 分页；详情（含 IP）；标记待处理/已处理；删除 |
-| 账号管理 | `{P}/accounts` | 多管理员：新增（服务端随机强密码，仅返回一次）/ 启停 / 重置密码 / 删除（无 RBAC） |
+| 账号管理 | `{P}/accounts` | 多管理员：新增（服务端随机强密码，仅返回一次）/ 启停 / 重置密码 / 删除；**固定三角色 + 模块级权限**（见 §5.3） |
 | 操作日志 | `{P}/logs` | 审计流水只读：模块 / 操作人 / 结果 / 时间范围 / 关键词筛选 + 详情；保留 180 天，`oplog:clean` 清理 |
 
 > 图片上传（`{P}/api/upload/image`）不单独占一页，由产品 / 新闻 / 案例 / 网站配置表单内的 `ImageField` 调用；
@@ -235,6 +235,27 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 - **唯一标识 id 创建后不可改**：`id` 直接构成前台详情页 URL，后台编辑态只读；
   后端对「编辑态 + 目标 id 不存在」返回 `4004`（不再静默新建），避免旧链接 404。
 - **降级兜底**：前台接口失败时回退 `frontend/src/data/*.ts`，不白屏；恢复后点「重新加载」。
+
+### 5.3 角色与权限（RBAC）
+
+**固定三角色**，不支持自定义角色；权限粒度到**模块**，分「读 / 写」两档。账号的角色在
+`{P}/accounts` 的「角色」列行内切换（自己与主账号的行置灰，防止自锁）。
+
+| 角色 | 标识 | 权限范围 |
+| --- | --- | --- |
+| 超级管理员 | `admin` | 全部模块读写（含账号管理、操作日志） |
+| 编辑 | `editor` | 内容模块（产品 / 新闻 / 案例 / 优势 / 关于 / 网站配置 / 留言 / 上传）读写；**账号管理、操作日志不可见** |
+| 只读 | `viewer` | 内容模块仅可查看；**所有写操作返回 `1009`**；账号管理、操作日志不可见 |
+
+- **模块清单**（10 个）：`product`、`news`、`case`、`advantage`、`about`、`site`、`message`、`upload`、`account`、`oplog`。
+- **权限标识**：`{module}.read` / `{module}.write`；角色规则支持通配符（`*`、`module.*`），
+  配置在 `backend/config/cms.php` 的 `roles`，前端 `permissions` 随之下发，仅用于**隐藏入口**。
+- **强制点在后端**：`AdminAuth` 中间件在鉴权后按「控制器 → 模块、动作 → 读/写」判定，
+  拒绝时返回 `{ "code": 1009 }` + HTTP `403`；前端的菜单过滤与「无权限」卡片只是体验层，绕过无害。
+- **未知角色**一律降级为 `viewer`（读多写少，失败方向安全）；`change-role` 对非法角色直接 `1001`，不静默兜底。
+- **护栏**：不能修改自己的角色；主账号不可降级；系统至少保留 1 个启用的 `admin`。
+- **扩展方式**：新增内容模块时，在 `Rbac::MODULES` 与 `config/cms.php` 的 `roles` 里补 `{module}.*` / `{module}.read`，
+  并在 `Rbac::moduleOf()` 补控制器映射即可。
 
 ---
 
@@ -285,6 +306,7 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 | 1006 | 需要先修改初始密码 | 403 | 前端跳改密页 |
 | 1007 | 原密码错误 | 400 | 修改密码场景 |
 | 1008 | 请求过于频繁（限流） | 429 | 登录 / 留言接口 |
+| 1009 | 无权限（角色不足） | 403 | RBAC 拦截，如 `viewer` 调写接口（见 §5.3） |
 | 4004 | 资源不存在 | 404 | 含未命中路由与未配置后台路径 |
 | 5000 | 服务器内部异常 | 500 | — |
 

@@ -6,6 +6,7 @@ namespace app\middleware;
 use app\model\AdminSession;
 use app\model\AdminUser;
 use app\service\OpLogContext;
+use app\service\Rbac;
 use Closure;
 use think\Request;
 use think\Response;
@@ -72,6 +73,17 @@ class AdminAuth
         // 4) 强制改密闸门
         if ((int) $admin->must_change_password === 1 && !$this->isPwdWhitelisted($request)) {
             return fail(error_code()['NEED_RESET_PWD'], '请先修改初始密码');
+        }
+
+        // 4.5) 权限闸门（RBAC，模块级）
+        //      自助接口（auth/*）不在 CONTROLLER_MODULE 内 → 不拦截；
+        //      前端菜单隐藏只是体验，**这里才是安全边界**。
+        $module = Rbac::moduleOf((string) $request->controller(), (string) $request->action());
+        if ($module !== null) {
+            $role = Rbac::roleOf($admin->role);
+            if (!Rbac::allows($role, $module, Rbac::actionType((string) $request->action()))) {
+                return fail(error_code()['FORBIDDEN'], '当前角色无权执行该操作');
+            }
         }
 
         // 5) 放行：注入当前管理员与 Token（并采集操作日志上下文）

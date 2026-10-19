@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CMS_PAGE_SIZES, MESSAGES } from '@/constants';
+import { CMS_PAGE_SIZES, MESSAGES, CMS_ROLES, CMS_ROLE_HINTS, CMS_ROLE_LABELS } from '@/constants';
+import type { CmsRole } from '@/constants';
 import DataTable from '@/components/cms/DataTable';
 import type { DataTableColumn } from '@/components/cms/DataTable';
 import ConfirmDialog from '@/components/cms/ConfirmDialog';
@@ -8,6 +9,7 @@ import FormDrawer from '@/components/cms/FormDrawer';
 import { TextField } from '@/components/cms/FormFields';
 import Toast from '@/components/common/Toast';
 import {
+  changeAdminRole,
   createAdmin,
   deleteAdmin,
   fetchAdminList,
@@ -224,6 +226,7 @@ export default function AccountsManage() {
   /* ---------- 新建 ---------- */
   const [createOpen, setCreateOpen] = useState(false);
   const [createName, setCreateName] = useState('');
+  const [createRole, setCreateRole] = useState<CmsRole>('viewer');
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -243,8 +246,24 @@ export default function AccountsManage() {
   /** 打开新建抽屉 */
   const openCreate = (): void => {
     setCreateName('');
+    setCreateRole('viewer');
     setCreateError('');
     setCreateOpen(true);
+  };
+
+  /** 调整角色（行内下拉） */
+  const handleChangeRole = async (row: AdminListItem, role: CmsRole): Promise<void> => {
+    if (role === row.role) {
+      return;
+    }
+    try {
+      await changeAdminRole(row.id, role);
+      showToast(`已将 ${row.username} 设为「${CMS_ROLE_LABELS[role]}」`);
+      await list.refresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : MESSAGES.NETWORK_ERROR, 'error');
+      await list.refresh();
+    }
   };
 
   /** 提交新建 */
@@ -265,7 +284,7 @@ export default function AccountsManage() {
     setCreateError('');
     setCreating(true);
     try {
-      const result = await createAdmin(name);
+      const result = await createAdmin(name, createRole);
       setCreateOpen(false);
       setCredential(result);
       await list.refresh();
@@ -369,6 +388,30 @@ export default function AccountsManage() {
             )}
           </span>
         ),
+      },
+      {
+        key: 'role',
+        title: '角色',
+        width: '150px',
+        render: (row): ReactNode => {
+          // 自己与主账号不可改角色（后端同样会拒绝，这里只提前置灰）
+          const locked = row.is_self || row.is_primary === 1;
+          return (
+            <select
+              value={row.role}
+              disabled={locked}
+              aria-label={`${row.username} 的角色`}
+              onChange={(e) => void handleChangeRole(row, e.target.value as CmsRole)}
+              className="w-full rounded-btn border border-border bg-white px-2 py-1 text-xs text-text disabled:cursor-not-allowed disabled:bg-bg-soft disabled:text-text-muted"
+            >
+              {CMS_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {CMS_ROLE_LABELS[role]}
+                </option>
+              ))}
+            </select>
+          );
+        },
       },
       {
         key: 'status',
@@ -551,6 +594,30 @@ export default function AccountsManage() {
             placeholder="如 editor01"
             error={createError}
           />
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium text-text">
+              角色<span className="ml-0.5 text-error">*</span>
+            </legend>
+            {CMS_ROLES.map((role) => (
+              <label
+                key={role}
+                className="flex cursor-pointer items-start gap-3 rounded-btn border border-border px-3 py-2 hover:border-primary/60"
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value={role}
+                  checked={createRole === role}
+                  onChange={() => setCreateRole(role)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-text">{CMS_ROLE_LABELS[role]}</span>
+                  <span className="block text-xs text-text-secondary">{CMS_ROLE_HINTS[role]}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           <p className="rounded-btn border border-border bg-bg-soft px-3 py-2 text-xs text-text-secondary">
             初始密码由服务端随机生成，创建后<b className="text-text">仅展示一次</b>
             ，请立即保存并交付给使用者。该账号首次登录时会被强制修改密码。

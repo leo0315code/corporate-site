@@ -70,6 +70,8 @@ export const ERROR_CODES = {
   OLD_PWD_WRONG: 1007,
   /** 请求过于频繁（限流） */
   TOO_MANY_REQ: 1008,
+  /** 无权限（RBAC 拒绝） */
+  FORBIDDEN: 1009,
   NOT_FOUND: 4004,
   SERVER_ERROR: 5000,
 } as const;
@@ -101,6 +103,56 @@ export const CMS_ROUTES = {
   OPLOGS: `${CMS.PATH}/oplogs`,
 } as const;
 
+/** 受管模块（与后端 `Rbac::MODULES` 一致） */
+export const CMS_MODULES = {
+  PRODUCT: 'product',
+  NEWS: 'news',
+  CASE: 'case',
+  ADVANTAGE: 'advantage',
+  ABOUT: 'about',
+  SITE: 'site',
+  MESSAGE: 'message',
+  ACCOUNT: 'account',
+  OPLOG: 'oplog',
+  UPLOAD: 'upload',
+} as const;
+
+/** 模块名联合类型 */
+export type CmsModule = (typeof CMS_MODULES)[keyof typeof CMS_MODULES];
+
+/** 固定三角色（与后端 `Rbac::ROLES` 一致，不支持自定义） */
+export const CMS_ROLES = ['admin', 'editor', 'viewer'] as const;
+
+/** 角色名联合类型 */
+export type CmsRole = (typeof CMS_ROLES)[number];
+
+/** 角色中文名（与后端 `config/cms.php` 的 role_labels 一致） */
+export const CMS_ROLE_LABELS: Record<CmsRole, string> = {
+  admin: '超级管理员',
+  editor: '内容编辑',
+  viewer: '只读运营',
+};
+
+/** 角色说明（新建账号弹窗里的提示文案） */
+export const CMS_ROLE_HINTS: Record<CmsRole, string> = {
+  admin: '全部模块读写，含账号管理与操作日志',
+  editor: '内容 / 网站配置 / 留言 / 上传，不能管理账号与日志',
+  viewer: '只能查看内容与留言，不能保存或删除',
+};
+
+/** 后台路径 → 模块（用于菜单过滤与路由守卫；未列出的页面不纳入 RBAC） */
+export const CMS_PATH_MODULE: Record<string, CmsModule> = {
+  [CMS_ROUTES.PRODUCTS]: CMS_MODULES.PRODUCT,
+  [CMS_ROUTES.NEWS]: CMS_MODULES.NEWS,
+  [CMS_ROUTES.CASES]: CMS_MODULES.CASE,
+  [CMS_ROUTES.ADVANTAGES]: CMS_MODULES.ADVANTAGE,
+  [CMS_ROUTES.ABOUT]: CMS_MODULES.ABOUT,
+  [CMS_ROUTES.SITE]: CMS_MODULES.SITE,
+  [CMS_ROUTES.MESSAGES]: CMS_MODULES.MESSAGE,
+  [CMS_ROUTES.ACCOUNTS]: CMS_MODULES.ACCOUNT,
+  [CMS_ROUTES.OPLOGS]: CMS_MODULES.OPLOG,
+};
+
 /** 后台统一文案（后端错误码 → 兜底中文；页面优先展示后端 message） */
 export const CMS_MESSAGES = {
   [ERROR_CODES.UNAUTHORIZED]: '登录已过期，请重新登录',
@@ -109,6 +161,7 @@ export const CMS_MESSAGES = {
   [ERROR_CODES.NEED_RESET_PWD]: '请先修改初始密码',
   [ERROR_CODES.OLD_PWD_WRONG]: '原密码错误',
   [ERROR_CODES.TOO_MANY_REQ]: '请求过于频繁，请稍后再试',
+  [ERROR_CODES.FORBIDDEN]: '当前角色无权执行该操作',
   [ERROR_CODES.VALIDATE_FAIL]: '提交内容不合法',
   [ERROR_CODES.NOT_FOUND]: '资源不存在',
   [ERROR_CODES.SERVER_ERROR]: '服务器开小差了，请稍后重试',

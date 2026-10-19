@@ -2,6 +2,8 @@
    全站类型定义（与 docs/class-diagram.mermaid 完全一致）
    ============================================================ */
 
+import type { CmsRole } from '@/constants';
+
 /** 统一响应格式：code=0 表示成功 */
 export interface ApiResponse<T = unknown> {
   code: number;
@@ -213,6 +215,10 @@ export interface ListQuery {
 export interface AdminProfile {
   id: number;
   username: string;
+  /** 角色：admin / editor / viewer（固定三角色） */
+  role: CmsRole;
+  /** 展开后的权限点（如 `product.read`），后端下发，前端只用于隐藏入口 */
+  permissions: string[];
   must_change_password: boolean;
   status: number;
   last_login_at: string | null;
@@ -259,6 +265,8 @@ export interface ResetPasswordPayload {
 export interface AdminListItem {
   id: number;
   username: string;
+  /** 角色：admin / editor / viewer */
+  role: CmsRole;
   /** 1=启用 0=停用 */
   status: number;
   /** 1=需强制改密（新建 / 重置后） */

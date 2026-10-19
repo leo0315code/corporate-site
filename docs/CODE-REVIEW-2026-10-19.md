@@ -141,7 +141,8 @@
 | P2-10 | SEO 短板 | ✅ 已修复 | robots.txt / sitemap:gen / OG 封面 / JSON-LD / noindex + **`npm run prerender`（20 条路由独立 title/description/canonical/og + noscript 内链）** |
 | P2-9 | slug 主键改 URL 无 301 | ✅ 已修复（改为不可变） | 后台 `IdField` 编辑态只读；后端编辑命中不到 id → **4004**，不再静默 upsert 新建（`ContentSaveTest` 覆盖） |
 | P2-11 | 上传无压缩/缩略图 | ✅ 已修复 | 上传自动生成 480px WebP 缩略图（`_thumb.webp`）+ jpg/webp >800KB 或长边 >1920 时压缩；列表页改用 `ThumbImage`，失败自动回退原图 |
-| P2-12 | ContentService 偏大 | ✅ 已修复 | 1146 行 → **452 行**；拆出 `content/ContentSchema`（元数据）、`ContentReadService`（前台只读）、`AboutService`、`SiteConfigService`、`ContentDiff`、`TextList` |
+| P2-12 | ContentService 偏大 | ✅ 已修复 | 1146 行 → **479 行**；拆出 `content/ContentSchema`（元数据）、`ContentReadService`（前台只读）、`AboutService`、`SiteConfigService`、`ContentDiff`、`TextList` |
+| 新增-13 | 账号无权限区分（原「所有管理员权限相同」） | ✅ 已补强 | 固定三角色（`admin`/`editor`/`viewer`）+ 模块级 `{module}.read/write`；`Rbac` 判定在 `AdminAuth` 中间件强制（`1009` / HTTP 403），前端仅做菜单与卡片降级；7 个用例覆盖（README §5.3） |
 
 ## 六、建议执行顺序
 

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `admin_user` (
   `must_change_password` TINYINT(1)   NOT NULL DEFAULT 1        COMMENT '1=需强制修改初始密码',
   `status`               TINYINT      NOT NULL DEFAULT 1        COMMENT '1=启用 0=禁用',
   `is_primary`           TINYINT(1)   NOT NULL DEFAULT 0        COMMENT '1=主账号（不可停用/删除，由 cms:init 创建或回填）',
+  `role`                 VARCHAR(20)  NOT NULL DEFAULT 'viewer' COMMENT 'RBAC 角色：admin / editor / viewer',
   `last_login_at`        DATETIME     NULL DEFAULT NULL         COMMENT '最近登录时间',
   `last_login_ip`        VARCHAR(45)  NOT NULL DEFAULT ''       COMMENT '最近登录 IP',
   `created_at`           DATETIME     NOT NULL,
@@ -49,6 +50,22 @@ SET @sql_backfill = IF(@has_primary = 0, 'UPDATE `admin_user` SET `is_primary` =
 PREPARE stmt_backfill FROM @sql_backfill;
 EXECUTE stmt_backfill;
 DEALLOCATE PREPARE stmt_backfill;
+
+-- admin_user 角色列（幂等）：RBAC 固定三角色 admin / editor / viewer
+-- 老库升级：新增列默认 'viewer'（最小权限），随后把**既有账号统一回填为 admin**，
+-- 保证升级后原管理员的权限不缩水；新账号由后台显式指定角色。
+SET @role_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = @db_name AND TABLE_NAME = 'admin_user' AND COLUMN_NAME = 'role');
+SET @sql_role = IF(@admin_exists = 1 AND @role_exists = 0, 'ALTER TABLE `admin_user` ADD COLUMN `role` VARCHAR(20) NOT NULL DEFAULT ''viewer'' COMMENT ''RBAC 角色：admin / editor / viewer'' AFTER `is_primary`', 'SELECT 1');
+PREPARE stmt_role FROM @sql_role;
+EXECUTE stmt_role;
+DEALLOCATE PREPARE stmt_role;
+
+-- 回填：**本次刚加列**时把既有账号统一升为 admin（升级前没有角色概念，原有管理员应保持全权）
+-- 幂等：列已存在（@role_exists=1）则完全跳过，不会覆盖后续人工调整的角色
+SET @sql_role_backfill = IF(@role_exists = 0, 'UPDATE `admin_user` SET `role` = ''admin''', 'SELECT 1');
+PREPARE stmt_role_backfill FROM @sql_role_backfill;
+EXECUTE stmt_role_backfill;
+DEALLOCATE PREPARE stmt_role_backfill;
 
 -- ---------- 2) 会话 Token ----------
 CREATE TABLE IF NOT EXISTS `admin_session` (

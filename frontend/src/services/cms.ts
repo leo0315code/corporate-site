@@ -1,9 +1,11 @@
 import { clearContentCache, cmsRequest, cmsUnwrap, cmsUpload, ApiError } from '@/services/api';
 import { clearToken, getToken, handleAuthError } from '@/utils/authToken';
+import type { CmsRole } from '@/constants';
 import type {
   AboutData,
   AdminCredentialResult,
   AdminListData,
+  AdminListItem,
   AdminProfile,
   ChangePasswordPayload,
   ImageUploadResult,
@@ -416,14 +418,33 @@ export async function fetchAdminList(
  * @param username 登录账号（字母开头，3~50 位字母/数字/下划线/短横线）
  * @returns 新账号信息 + 一次性随机密码
  */
-export async function createAdmin(username: string): Promise<AdminCredentialResult> {
+export async function createAdmin(username: string, role: CmsRole): Promise<AdminCredentialResult> {
   return guard(async () => {
     const res = await cmsRequest<AdminCredentialResult>(
       '/admin/create',
-      { method: 'POST', body: JSON.stringify({ username }) },
+      { method: 'POST', body: JSON.stringify({ username, role }) },
       getToken(),
     );
     return cmsUnwrap<AdminCredentialResult>(res);
+  });
+}
+
+/**
+ * 调整账号角色（POST {P}/api/admin/change-role）
+ *
+ * 守卫在后端：不能改自己、主账号不可降级、至少保留 1 个启用超管。
+ *
+ * @param id   目标账号 ID
+ * @param role 新角色
+ */
+export async function changeAdminRole(id: number, role: CmsRole): Promise<AdminListItem> {
+  return guard(async () => {
+    const res = await cmsRequest<AdminListItem>(
+      '/admin/change-role',
+      { method: 'POST', body: JSON.stringify({ id, role }) },
+      getToken(),
+    );
+    return cmsUnwrap<AdminListItem>(res);
   });
 }
 
