@@ -41,7 +41,7 @@ aicode/
 │       ├── layouts/              # MainLayout + ScrollToTop + CmsLayout（后台壳）
 │       ├── sections/             # 首页 6 大区块（数据经 props 下发）
 │       ├── hooks/useContent.ts   # ★ 前台内容读取 Hook（加载/错误/降级/重试）
-│       ├── pages/                # 页面（前台 5 页 + pages/cms/* 后台页）
+│       ├── pages/                # 页面（前台 6 页 + 404 + pages/cms/* 后台页）
 │       ├── router.tsx            # 路由表（按 CMS.PATH 条件注册后台路由）
 │       ├── services/api.ts       # 公共 API 封装（超时/错误归一化/内容缓存）
 │       ├── services/cms.ts       # ★ 后台管理 API 客户端（Token 注入/错误码分流）
@@ -51,18 +51,19 @@ aicode/
     ├── .example.env              # 环境变量示例（复制为 .env；含 CMS_PATH）
     ├── think                     # TP 命令行入口
     ├── public/index.php          # 应用入口
-    ├── database/cms.sql          # ★ CMS 建表脚本（8 张表 + message 加列）
+    ├── database/cms.sql          # ★ 建表脚本（10 张表 + message 加列，幂等）
     ├── database/seed/cms-seed.json # ★ 迁移种子（源自 frontend/src/data/*.ts）
     ├── config/                   # 配置（database / app / middleware / cms ...）
     ├── route/app.php             # 路由：公共 /api/*（匿名）+ {CMS_PATH}/api/*（鉴权）
+    ├── tests/                    # ★ PHPUnit 用例（sqlite 内存库，不依赖 MySQL）
     └── app/
         ├── common.php            # success() / fail() 统一响应 + cms_path()
-        ├── middleware/           # Cors / AdminAuth / LoginThrottle / ContentCache
-        ├── controller/           # Auth / Content / Home / Message / PublicContent
-        ├── service/              # AuthService / ContentService / HomeService / MessageService
-        ├── model/                # AdminUser/AdminSession/LoginAttempt/Product/News/... /Message
-        ├── validate/             # AuthValidate / ContentValidate / MessageValidate
-        └── command/CmsInit.php   # ★ php think cms:init（建表 + 迁移 + 建管理员）
+        ├── middleware/           # Cors / AdminAuth / LoginThrottle / MessageThrottle / ContentCache
+        ├── controller/           # Auth / Content / Home / Message / PublicContent / Admin / Upload / OpLog
+        ├── service/              # Auth / Content / Home / Message / Admin / Upload / OpLog(+Context)
+        ├── model/                # AdminUser/AdminSession/LoginAttempt/Product/News/.../SiteConfig/OpLog
+        ├── validate/             # Auth / Content / Message / Admin 校验器
+        └── command/              # cms:init / oplog:clean / session:clean / sitemap:gen
 ```
 
 ---
@@ -191,13 +192,21 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 | 案例管理 | `{P}/cases` | 同上 |
 | 优势管理 | `{P}/advantages` | 同上（**自增主键**，新增不填 id） |
 | 关于我们 | `{P}/about` | 单例整页分区编辑 + 保存（价值观 / 时间轴 / 能力资质可增删） |
+| 网站配置 | `{P}/site` | 公司信息 / 联系方式 / 页脚 / 社交链接 / SEO 单例编辑（导航与主题色仍走前端配置） |
 | 留言管理 | `{P}/messages` | 列表 + 关键词 + 状态筛选 + 分页；详情（含 IP）；标记待处理/已处理；删除 |
+| 账号管理 | `{P}/accounts` | 多管理员：新增（服务端随机强密码，仅返回一次）/ 启停 / 重置密码 / 删除（无 RBAC） |
+| 操作日志 | `{P}/logs` | 审计流水只读：模块 / 操作人 / 结果 / 时间范围 / 关键词筛选 + 详情；保留 180 天，`oplog:clean` 清理 |
+
+> 图片上传（`{P}/api/upload/image`）不单独占一页，由产品 / 新闻 / 案例 / 网站配置表单内的 `ImageField` 调用；
+> 仅接收 jpg / png / webp / gif（**不收 SVG**，避免同源脚本执行面），≤5 MB，落盘随机文件名。
 
 ### 5.2 关键约定
 
 - **后台前缀同值**：前端 `VITE_CMS_PATH` = 后端 `CMS_PATH`；未配置（空）→ 后台整体 404。
 - **鉴权**：除登录外，后台 API（`{P}/api/*`）均需 `Authorization: Bearer <token>`；
   未登录 / Token 失效 → `1003` 跳登录；未改初始密码 → `1006` 跳改密页。
+- **会话续期**：Token 有效期 2 小时，剩余不足 30 分钟时访问自动顺延 2 小时（滑动续期）。
+- **审计**：所有写操作（含登录失败、上传、账号变更）落 `op_log`，写入旁路——日志失败不影响业务。
 - **刷新即生效**：后台保存 / 删除成功后前端清除内容缓存，前台刷新即见最新内容。
 - **降级兜底**：前台接口失败时回退 `frontend/src/data/*.ts`，不白屏；恢复后点「重新加载」。
 
@@ -218,30 +227,46 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 | GET | `/api/case/list` | 案例列表（全量） | — |
 | GET | `/api/advantage/list` | 优势列表（全量，含 id） | — |
 | GET | `/api/about/detail` | 关于我们（单例） | — |
+| GET | `/api/site/config` | 站点配置（公司/联系/页脚/SEO） | — |
 | GET | `/api/home/summary` | 首页聚合 | `productLimit,newsLimit` |
-| POST | `/api/message` | 提交留言 | `name,company,phone,email,content` |
+| POST | `/api/message` | 提交留言 | `name,company,phone,email,content`（同 IP 限流，见 6.4） |
 
 ### 6.2 后台管理接口（`{P}/api/*`，除 login 外均需 Bearer Token）
 
-`login / logout / profile / reset-password / password`、`content/{product,news,case,advantage}/{list,save,delete}`、
-`content/about/{detail,save}`、`message/{list,detail,status,delete}`。详见
-[`docs/CMS-USAGE.md`](docs/CMS-USAGE.md) 与 `docs/ARCHITECTURE-CMS.md` 3.4 节。
+| 分组 | 接口 |
+| --- | --- |
+| 认证 | `login` / `logout` / `profile` / `reset-password` / `password` |
+| 内容 | `content/{product,news,case,advantage}/{list,save,delete}`、`content/about/{detail,save}`、`content/site/{detail,save}` |
+| 留言 | `message/{list,detail,status,delete}` |
+| 账号 | `admin/{list,create,toggle-status,reset-password,delete}` |
+| 上传 | `upload/image`（multipart，字段名 `file`，`type=product|news|case|common`） |
+| 审计 | `oplog/{list,detail}`（只读） |
+
+详见 [`docs/CMS-USAGE.md`](docs/CMS-USAGE.md) 与 `docs/ARCHITECTURE-CMS.md` 3.4 节。
 
 ### 6.3 错误码表
 
-| code | 含义 | 说明 |
-| ---- | ------------------------------------------------- | --- |
-| 0    | 成功 | — |
-| 1001 | 参数校验失败 | message 为具体字段错误 |
-| 1002 | 重复提交 | 幂等审计 |
-| 1003 | 未登录 / Token 无效或过期 | 前端清 Token 跳登录页 |
-| 1004 | 账号或密码错误 | 不区分账号/密码，防枚举 |
-| 1005 | 登录失败次数过多（已锁定） | message 含剩余时间 |
-| 1006 | 需要先修改初始密码 | 前端跳改密页 |
-| 1007 | 原密码错误 | 修改密码场景 |
-| 1008 | 请求过于频繁（限流） | 登录接口 |
-| 4004 | 资源不存在 | 含未配置后台路径时的 404 |
-| 5000 | 服务器内部异常 | — |
+`code` 为业务码；HTTP 状态码按业务语义映射（便于 Nginx / WAF / 监控按状态码告警与设阈值）。
+
+| code | 含义 | HTTP | 说明 |
+| ---- | -------------------------------- | ---- | --- |
+| 0    | 成功 | 200 | — |
+| 1001 | 参数校验失败 | 400 | message 为具体字段错误 |
+| 1002 | 重复提交 | 409 | 幂等审计 |
+| 1003 | 未登录 / Token 无效或过期 | 401 | 前端清 Token 跳登录页 |
+| 1004 | 账号或密码错误 | 401 | 不区分账号/密码，防枚举 |
+| 1005 | 登录失败次数过多（已锁定） | 423 | message 含剩余时间 |
+| 1006 | 需要先修改初始密码 | 403 | 前端跳改密页 |
+| 1007 | 原密码错误 | 400 | 修改密码场景 |
+| 1008 | 请求过于频繁（限流） | 429 | 登录 / 留言接口 |
+| 4004 | 资源不存在 | 404 | 含未命中路由与未配置后台路径 |
+| 5000 | 服务器内部异常 | 500 | — |
+
+### 6.4 留言防刷
+
+`POST /api/message` 除「同 IP + 同内容 60 秒幂等」外，另有 IP 维度滑动窗口限流：
+默认 **10 分钟 5 条**，超限返回 `1008`（HTTP 429）。阈值由 `.env` 的
+`MESSAGE_RATE_MAX` / `MESSAGE_RATE_WINDOW` 控制（见 `.example.env`）。
 
 ---
 
@@ -257,6 +282,22 @@ server {
 
     root /var/www/corporate-site/frontend/dist;
     index index.html;
+
+    # ===== 后台上传的图片（勿被下方静态资源正则抢走，^~ 不可省）=====
+    location ^~ /uploads/ {
+        alias /var/www/corporate-site/backend/public/uploads/;
+        # 只放行位图；万一有历史 .svg 也强制下载，避免同源脚本执行
+        location ~* \.svg$ {
+            add_header Content-Disposition "attachment" always;
+            add_header Content-Security-Policy "sandbox" always;
+        }
+        if ($uri !~* \.(?:jpg|jpeg|png|gif|webp|svg)$) {
+            return 403;
+        }
+        add_header X-Content-Type-Options "nosniff" always;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
 
     # ===== 后台管理 API（须置于通用 SPA 回退之前）=====
     # {CMS_PATH} 与实际配置一致，例如 /manage-x7k2
@@ -294,7 +335,34 @@ server {
 > - **只**把 `/api` 与 `{CMS_PATH}/api` 反代到后端；后台**页面路由**（如 `{CMS_PATH}/login`）
 >   由前端 SPA 处理，通用 `location /` 的 SPA 回退已覆盖，**无需**为后台单独配置回退。
 > - 若确需为后台前缀单独加 SPA 回退，务必使其**位于 `{CMS_PATH}/api` 反代规则之后**。
+> - `/uploads/` 必须用 `^~` 前缀匹配，否则会被静态资源正则抢走而 404。
 > - Windows + ServBay 环境同样适用：`root` 指向 `dist`，反代指向 `php think run` 或 php-cgi 的 8000 端口。
+
+### 7.1 上线检查清单
+
+| 项 | 要求 |
+| --- | --- |
+| `APP_DEBUG` | **必须** `false`（否则 5000 会回显异常原文）；`APP_TRACE=false` |
+| `CMS_PATH` | 前后端一致，且**不是** `admin` / `manage` 之类可猜路径 |
+| 目录权限 | `backend/runtime/`、`backend/public/uploads/` 可写；其余目录只读 |
+| 目录暴露 | 仅 `backend/public` 作为站点根，`backend/app`、`config`、`.env` **不可**被 Web 访问 |
+| 数据库账号 | 生产使用最小权限账号（禁 `DROP`/`GRANT`），勿用 root |
+| 备份 | `mysqldump` 每日全量 + binlog；`uploads/` 同步备份 |
+
+### 7.2 定时任务（运维必配）
+
+```bash
+# 操作日志清理（默认保留 180 天，可 --days 覆盖）
+php think oplog:clean
+# 过期管理员会话清理（建议与上一条同频执行）
+php think session:clean
+# 站点地图生成（写入 frontend/public/sitemap.xml，构建后随 dist 发布）
+php think sitemap:gen
+```
+
+- Linux：`crontab -e` 加 `0 3 * * * cd /var/www/corporate-site/backend && php think oplog:clean && php think session:clean`
+- Windows：任务计划程序创建每日 03:00 任务，程序填 `php.exe`，参数 `think oplog:clean`，起始于 `backend` 目录。
+- 未配置定时任务不影响功能，但 `op_log` / `admin_session` 会持续增长。
 
 ---
 
@@ -308,7 +376,9 @@ server {
    确认前后端 `VITE_CMS_PATH` / `CMS_PATH` 已配置且**完全一致**，并已重启前后端服务。
 4. **`php think run` 端口被占用？**  
    使用 `php think run -p 8001` 并同步修改 `frontend/vite.config.ts` 的 proxy 目标。
-5. **不装 MySQL 想快速体验？**  
+5. **留言提交返回 `1008`（HTTP 429）？**  
+   触发 IP 维度限流（默认 10 分钟 5 条），等待窗口结束或调整 `.env` 的 `MESSAGE_RATE_MAX` / `MESSAGE_RATE_WINDOW`。
+6. **不装 MySQL 想快速体验？**  
    `backend/.env` 设 `TYPE = sqlite`，并准备 sqlite 驱动与库文件（备选方案）。
 
 ---
