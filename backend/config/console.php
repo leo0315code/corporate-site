@@ -10,5 +10,7 @@ return [
         'cms:init' => \app\command\CmsInit::class,
         // 操作日志清理：按保留期分批删除（幂等、不写日志）
         'oplog:clean' => \app\command\OpLogClean::class,
+        // 会话清理：过期 admin_session + 历史登录失败计数（幂等）
+        'session:clean' => \app\command\SessionClean::class,
     ],
 ];

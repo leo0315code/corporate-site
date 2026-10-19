@@ -23,12 +23,13 @@
   RemoveType .php .php3 .php4 .php5 .php7 .php8 .phtml .pht .phar .cgi .pl .py .jsp .asp .aspx .shtml
 </IfModule>
 
-# 3) 仅允许图片扩展名被直接访问；脚本类一律 403（Apache 2.4）
+# 3) 仅允许位图扩展名被直接访问；脚本类与 svg 一律 403（Apache 2.4）
+#    说明：业务层已拒绝 SVG 上传（同源 SVG 可执行脚本）；此处兜底拦截历史遗留文件。
 <IfModule mod_authz_core.c>
-  <FilesMatch "\.(?i:jpg|jpeg|png|gif|webp|svg)$">
+  <FilesMatch "\.(?i:jpg|jpeg|png|gif|webp)$">
     Require all granted
   </FilesMatch>
-  <FilesMatch "\.(?i:php|php3|php4|php5|php7|php8|phtml|pht|phar|cgi|pl|py|jsp|asp|aspx|shtml|htm|html|js|mjs|json|xml|txt|sh|exe|dll)$">
+  <FilesMatch "\.(?i:svg|php|php3|php4|php5|php7|php8|phtml|pht|phar|cgi|pl|py|jsp|asp|aspx|shtml|htm|html|js|mjs|json|xml|txt|sh|exe|dll)$">
     Require all denied
   </FilesMatch>
 </IfModule>

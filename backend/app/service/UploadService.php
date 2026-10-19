@@ -16,6 +16,12 @@ use think\Response;
  * 3. **真实 MIME（finfo 探测）**：以文件内容为准，**不信任**客户端 `Content-Type`；
  * 4. **扩展名白名单**：由 `getOriginalName()` 取出并小写，再与「MIME → 允许扩展名」表**交叉校验**，
  *    防止「改名成 .png 的 webshell」等后缀欺骗；
+ *
+ * 安全取舍（**不接受 SVG**）：SVG 是 XML 文档，同源直接访问 `uploads/*.svg` 时浏览器会以
+ * 文档方式执行其中的脚本，可读取 `localStorage` 中的管理 Token，构成存储型 XSS 通道。
+ * 因此 MIME 白名单只保留位图，SVG 一律拒绝；图标类需求由前端组件（ProductIcon）或
+ * 转成 PNG/WebP 后上传。
+ *
  * 5. **随机文件名**：`random_bytes` 生成，完全丢弃用户提供的文件名，杜绝路径穿越 / 覆盖；
  * 6. **落盘目录**：固定 `public/uploads/{type}/`，`type` 仅在白名单内取值；
  * 7. **目录加固**：`public/uploads/.htaccess` 禁止脚本执行（Apache），
@@ -41,19 +47,16 @@ class UploadService
      * 键为 finfo 探测出的**真实 MIME**；值为该 MIME 下**允许**的扩展名集合。
      * 仅当「真实 MIME 命中」且「客户端扩展名 ∈ 该 MIME 允许集」时才放行。
      *
-     * 说明：SVG 的真实 MIME 常见两种（`image/svg+xml` 与部分环境下的 `text/xml`、
-     * `text/plain`），因此显式声明三种，且只允许 `svg` 扩展名。
+     * 注意：**不含 SVG**（见类注释「安全取舍」）。`text/xml` / `text/plain` 同样不放行，
+     * 否则任何 XML/纯文本都能冒充图片落盘。
      *
      * @var array<string, string[]>
      */
     protected const MIME_EXT_MAP = [
-        'image/jpeg'    => ['jpg', 'jpeg'],
-        'image/png'     => ['png'],
-        'image/webp'    => ['webp'],
-        'image/gif'     => ['gif'],
-        'image/svg+xml' => ['svg'],
-        'text/xml'      => ['svg'],
-        'text/plain'    => ['svg'],
+        'image/jpeg' => ['jpg', 'jpeg'],
+        'image/png'  => ['png'],
+        'image/webp' => ['webp'],
+        'image/gif'  => ['gif'],
     ];
 
     /** 上传表单字段名（前端 FormData 的 key） */
@@ -110,7 +113,7 @@ class UploadService
         $mime = $this->detectMime($file);
         if (!isset(self::MIME_EXT_MAP[$mime])) {
             OpLogService::record('upload', 'upload', 0, '上传失败：不支持的格式', '', $originalName, $ctx);
-            return fail($code['VALIDATE_FAIL'], '仅支持 jpg / png / webp / svg / gif 格式的图片');
+            return fail($code['VALIDATE_FAIL'], '仅支持 jpg / png / webp / gif 格式的图片');
         }
 
         // —— 5. 扩展名交叉校验（防后缀欺骗）——
@@ -159,57 +162,27 @@ class UploadService
     /**
      * 探测文件真实 MIME（finfo，以内容为准）
      *
-     * SVG 兜底：部分环境下 finfo 会把 SVG 识别为 `image/svg+xml`，另有环境识别为
-     * `text/xml` / `text/plain`。若探测结果落在通用 XML/文本类，则用内容特征
-     * （含 `<svg`）二次确认，避免误判为可上传的图片。
+     * 不使用扩展名、不信任客户端 `Content-Type`；finfo 不可用时直接返回空串（一律拒绝），
+     * 宁可上传失败也不放行未识别内容。
      *
      * @param UploadedFile $file 上传文件
      * @return string 归一化后的 MIME（无法判定时返回空串）
      */
     protected function detectMime(UploadedFile $file): string
     {
-        $mime = '';
-
-        if (function_exists('finfo_open')) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            if ($finfo !== false) {
-                $detected = finfo_file($finfo, $file->getPathname());
-                finfo_close($finfo);
-                $mime = is_string($detected) ? strtolower($detected) : '';
-            }
-        }
-
-        // finfo 不可用时的兜底（仍然读取文件头部特征）
-        if ($mime === '') {
+        if (!function_exists('finfo_open')) {
             return '';
         }
 
-        // 通用 XML / 文本 → 用内容特征确认是否为 SVG
-        if (in_array($mime, ['text/xml', 'text/plain', 'application/xml'], true)) {
-            return $this->looksLikeSvg($file) ? 'image/svg+xml' : $mime;
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            return '';
         }
 
-        return $mime;
-    }
+        $detected = finfo_file($finfo, $file->getPathname());
+        finfo_close($finfo);
 
-    /**
-     * 判断文件内容是否形如 SVG（仅读取头部若干字节，避免大文件全量读入）
-     *
-     * @param UploadedFile $file 上传文件
-     * @return bool
-     */
-    protected function looksLikeSvg(UploadedFile $file): bool
-    {
-        $handle = @fopen($file->getPathname(), 'rb');
-        if ($handle === false) {
-            return false;
-        }
-
-        $head = (string) fread($handle, 4096);
-        fclose($handle);
-
-        // 允许前置 BOM / XML 声明 / 注释，只要出现 <svg 根标签即可
-        return stripos($head, '<svg') !== false;
+        return is_string($detected) ? strtolower($detected) : '';
     }
 
     /**

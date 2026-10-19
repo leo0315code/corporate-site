@@ -152,12 +152,12 @@ E:/ServBay/bin/php.cmd think oplog:clean --days=3650  # 演练：保留 10 年 �
 
 | 项 | 说明 |
 | --- | --- |
-| 支持格式 | jpg / jpeg / png / webp / svg / gif |
+| 支持格式 | jpg / jpeg / png / webp / gif（**不接受 SVG**：同源 SVG 可执行脚本，存在存储型 XSS 风险；图标请转 PNG/WebP） |
 | 大小上限 | 单张 ≤ **5MB** |
 | 存储位置 | `backend/public/uploads/{product\|news\|case}/` |
 | 文件命名 | 服务端随机 32 位十六进制（**丢弃原始文件名**，防路径穿越 / 覆盖） |
 | 返回路径 | `/uploads/<分组>/<随机名>.<扩展名>`，自动写入对应字段 |
-| 校验方式 | 服务端用 `finfo` 探测**真实 MIME**，并与扩展名**交叉校验**（防后缀欺骗） |
+| 校验方式 | 服务端用 `finfo` 探测**真实 MIME**，并与扩展名**交叉校验**（防后缀欺骗）；白名单外一律拒绝 |
 
 > 上传接口位于后台路径之下（`{CMS_PATH}/api/upload/image`）且**必须登录**，
 > 未登录返回 `1003`；因此**不会**存在匿名上传入口。
@@ -330,7 +330,7 @@ server {
         alias /var/www/corporate-site/backend/public/uploads/;
 
         # 仅允许图片扩展名访问（含 .php 等一律 403）
-        if ($uri !~* \.(?:jpg|jpeg|png|gif|webp|svg)$) {
+        if ($uri !~* \.(?:jpg|jpeg|png|gif|webp)$) {
             return 403;
         }
 
@@ -411,7 +411,7 @@ server {
 8. **改了 `CMS_PATH` 后原后台地址失效？**
    属预期行为：路径即配置值，前后端需同步修改并重启；未配置（空）则该前缀整体 404。
 
-9. **图片上传失败 / 提示「仅支持 jpg / png / webp / svg / gif」？**
+9. **图片上传失败 / 提示「仅支持 jpg / png / webp / gif」？**
    后端以文件**真实内容**（而非扩展名）判定格式。若把其他格式的文件改名成 `.png` 上传，
    会因 MIME 与扩展名不匹配被拒绝 —— 这是**预期**的安全防护，请改用真实图片格式。
 

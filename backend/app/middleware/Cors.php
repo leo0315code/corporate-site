@@ -8,18 +8,24 @@ use think\Request;
 use think\Response;
 
 /**
- * 跨域中间件（开发期双保险）
+ * 跨域中间件（生产收紧版）
  *
- * 开发期前端运行在 5173、后端在 8000，首选方案是 Vite proxy（无跨域）；
- * 本中间件作为备用方案，放行常见本地来源并处理 OPTIONS 预检。
+ * 策略：
+ * - 白名单来自环境变量 `CORS_ALLOW_ORIGINS`（逗号分隔）；未配置时回落到本地开发地址；
+ * - **命中白名单**：回显该 `Origin` 并允许携带凭据；
+ * - **未命中**：不下发任何 CORS 头（浏览器按同源策略拦截），不再回退 `*`；
+ * - 无 `Origin` 头（同域请求 / 服务端调用）：直接放行，不附加 CORS 头。
+ *
+ * 说明：同域部署（Nginx 反代 `/api`）本身不需要 CORS，白名单只为本地联调与
+ * 独立前端域保留；不要再使用通配来源，否则任何站点都能读取接口响应。
  */
 class Cors
 {
     /**
-     * 允许的来源（开发期本地调试地址）
+     * 默认允许来源（仅本地开发）
      * @var string[]
      */
-    protected array $allowOrigins = [
+    protected array $defaultOrigins = [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:8000',
@@ -34,54 +40,67 @@ class Cors
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $origin = $request->header('origin', '');
+        $origin      = trim((string) $request->header('origin', ''));
         $allowOrigin = $this->resolveOrigin($origin);
 
-        // 预检请求直接返回 204
+        // 预检：命中白名单才回 CORS 头，未命中也返回 204（由浏览器拦截）
         if ($request->method(true) === 'OPTIONS') {
             return $this->withHeaders(response('', 204), $allowOrigin);
         }
 
-        $response = $next($request);
-
-        return $this->withHeaders($response, $allowOrigin);
+        return $this->withHeaders($next($request), $allowOrigin);
     }
 
     /**
-     * 解析实际允许的来源：命中白名单则回显具体来源，否则回退为通配 '*'
-     * @param string $origin 请求携带的 Origin
-     * @return string
+     * 解析实际允许的来源
+     * @param string $origin 请求携带的 Origin（可能为空）
+     * @return string|null 命中返回来源；无 Origin 或未命中返回 null（不下发 CORS 头）
      */
-    protected function resolveOrigin(string $origin): string
+    protected function resolveOrigin(string $origin): ?string
     {
-        if ($origin !== '' && in_array($origin, $this->allowOrigins, true)) {
-            return $origin;
+        if ($origin === '') {
+            return null;
         }
-        // 未命中白名单时放行全部（开发期便利；生产建议收紧）
-        return '*';
+
+        return in_array($origin, $this->allowOrigins(), true) ? $origin : null;
     }
 
     /**
-     * 附加 CORS 响应头
-     * 注意：当来源回退为通配 '*' 时不发送 Allow-Credentials，
-     * 避免浏览器拒绝「通配来源 + 携带凭据」的组合。
-     * @param Response $response
-     * @param string   $allowOrigin
+     * 允许来源白名单（环境变量优先）
+     * @return string[]
+     */
+    protected function allowOrigins(): array
+    {
+        $raw = trim((string) env('CORS_ALLOW_ORIGINS', ''));
+
+        if ($raw === '') {
+            return $this->defaultOrigins;
+        }
+
+        $list = array_map('trim', explode(',', $raw));
+
+        return array_values(array_filter($list, static fn (string $item): bool => $item !== ''));
+    }
+
+    /**
+     * 附加 CORS 响应头（未命中白名单时不附加任何 CORS 头）
+     * @param Response    $response
+     * @param string|null $allowOrigin
      * @return Response
      */
-    protected function withHeaders(Response $response, string $allowOrigin): Response
+    protected function withHeaders(Response $response, ?string $allowOrigin): Response
     {
-        $headers = [
-            'Access-Control-Allow-Origin'  => $allowOrigin,
-            'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
-            'Access-Control-Max-Age'       => '86400',
-        ];
-
-        if ($allowOrigin !== '*') {
-            $headers['Access-Control-Allow-Credentials'] = 'true';
+        if ($allowOrigin === null) {
+            return $response;
         }
 
-        return $response->header($headers);
+        return $response->header([
+            'Access-Control-Allow-Origin'      => $allowOrigin,
+            'Access-Control-Allow-Methods'     => 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers'     => 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Max-Age'           => '86400',
+            'Access-Control-Allow-Credentials' => 'true',
+            'Vary'                             => 'Origin',
+        ]);
     }
 }

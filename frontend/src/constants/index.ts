@@ -213,12 +213,12 @@ export function oplogResultLabel(result: number): string {
 export const UPLOAD = {
   /** 单文件最大字节数：5MB */
   MAX_SIZE: 5 * 1024 * 1024,
-  /** 允许的扩展名（小写，含点） */
-  ACCEPT_EXT: ['.jpg', '.jpeg', '.png', '.webp', '.svg', '.gif'] as const,
+  /** 允许的扩展名（小写，含点）；**不含 svg**，与后端 MIME 白名单一致 */
+  ACCEPT_EXT: ['.jpg', '.jpeg', '.png', '.webp', '.gif'] as const,
   /** <input accept> 的值 */
-  ACCEPT_ATTR: '.jpg,.jpeg,.png,.webp,.svg,.gif',
+  ACCEPT_ATTR: '.jpg,.jpeg,.png,.webp,.gif',
   /** 文案提示 */
-  HINT: '支持 jpg / png / webp / svg / gif，单张不超过 5MB',
+  HINT: '支持 jpg / png / webp / gif，单张不超过 5MB',
 } as const;
 
 /**

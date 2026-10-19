@@ -75,6 +75,9 @@ class AdminAuth
         }
 
         // 5) 放行：注入当前管理员与 Token（并采集操作日志上下文）
+        //    滑动续期：剩余不足 30 分钟时顺延 2 小时（长表单编辑不再中途被踢）
+        AdminSession::renewIfNeeded($session);
+
         $request->admin      = $admin;
         $request->adminToken = $token;
         // 操作日志上下文：必须在 $request->admin 注入**之后**采集（fromRequest 读 $request->admin）

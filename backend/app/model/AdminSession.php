@@ -27,6 +27,9 @@ class AdminSession extends Model
     /** Token 有效期（秒）：2 小时 */
     public const TTL_SECONDS = 7200;
 
+    /** 滑动续期阈值（秒）：剩余不足 30 分钟时顺延，避免长表单编辑中途被踢 */
+    public const RENEW_THRESHOLD = 1800;
+
     /** 数据表名（不含前缀） */
     protected $name = 'admin_session';
 
@@ -91,6 +94,35 @@ class AdminSession extends Model
         ]);
 
         return $session;
+    }
+
+    /**
+     * 滑动续期：剩余有效期不足 `RENEW_THRESHOLD` 时，把到期时间顺延一个完整 TTL。
+     *
+     * 只在「同时满足」时落库：会话未过期、且剩余时间 < 阈值 —— 避免每个请求都写库。
+     * 由 `AdminAuth` 在校验通过后调用；写库失败不影响本次请求（续期是尽力而为）。
+     *
+     * @param AdminSession $session   已校验通过的会话
+     * @param int          $threshold 续期阈值（秒），默认 30 分钟
+     * @return bool true=已续期；false=未到期或已过期（不处理）
+     */
+    public static function renewIfNeeded(AdminSession $session, int $threshold = self::RENEW_THRESHOLD): bool
+    {
+        $remain = strtotime((string) $session->expires_at) - time();
+
+        if ($remain <= 0 || $remain >= $threshold) {
+            return false;
+        }
+
+        $session->expires_at = date('Y-m-d H:i:s', time() + self::TTL_SECONDS);
+
+        try {
+            $session->save();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -141,11 +141,11 @@ npm run build        # 产物输出到 frontend/dist
 ```bash
 cd backend
 composer install
-php vendor/bin/phpunit          # 33 个用例；--filter 可单跑
+php vendor/bin/phpunit          # 40 个用例；--filter 可单跑
 ```
 
 覆盖的高风险点：登录锁定与防枚举、会话签发、操作日志白名单/截断/旁路写入、
-留言校验与幂等、留言限流阈值、错误码 → HTTP 状态映射、后台路径归一化。
+留言校验与幂等、留言限流阈值、错误码 → HTTP 状态映射、后台路径归一化、CORS 白名单、会话滑动续期。
 
 前端类型检查与构建即为其门禁（无单元测试框架，纯逻辑由 `qa-test/` 脚本覆盖）：
 
@@ -369,6 +369,8 @@ server {
 | 目录权限 | `backend/runtime/`、`backend/public/uploads/` 可写；其余目录只读 |
 | 目录暴露 | 仅 `backend/public` 作为站点根，`backend/app`、`config`、`.env` **不可**被 Web 访问 |
 | 数据库账号 | 生产使用最小权限账号（禁 `DROP`/`GRANT`），勿用 root |
+| 跨域 | `CORS_ALLOW_ORIGINS` 显式列白名单；未配置不再回退 `*`，非白名单来源不下发 CORS 头 |
+| 上传格式 | 仅 jpg/png/webp/gif（**SVG 已在服务端拒绝**，历史 `.svg` 建议清理） |
 | 备份 | `mysqldump` 每日全量 + binlog；`uploads/` 同步备份 |
 
 ### 7.2 定时任务（运维必配）
