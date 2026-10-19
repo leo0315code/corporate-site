@@ -224,6 +224,8 @@ class ContentService
      * 语义：
      * - product / news / case（业务 slug 主键）：payload `_editing=true` 视为编辑；否则视为新增，
      *   新增时若 id 已存在 → **1001**（提示 id 已存在）；
+     * - **编辑态命中不到记录 → 4004**（`id` 构成前台 URL，**创建后不可修改**；
+     *   不做静默 upsert，避免改名后旧链接 404 + 悄悄多出一条记录）；
      * - advantage（INT 自增主键）：携带 id 视为编辑，否则新增。
      *
      * 埋点（C-P1-3）：在所有「状态被改变」的出口记录操作日志；无变化（幂等）不记，避免噪声。
@@ -309,25 +311,19 @@ class ContentService
 
             if ($isEdit) {
                 if ($exists === null) {
-                    // 编辑目标不存在：按新增处理（幂等 upsert 语义）
-                    $model::create($normalized);
-                    $after = $model::find($id)->toArray();
-                    $name  = $this->targetNameOf($type, $after);
-                    OpLogService::record(
-                        $type,
-                        'create',
-                        1,
-                        '新增：' . self::NAME_LABEL[$type] . '=' . $name,
-                        $id,
-                        $name,
-                        $ctx
+                    // 编辑态但目标不存在：**拒绝**，不再静默 upsert 新建。
+                    // 原因：id 构成前台详情页 URL，改名等于换链接且旧链接 404；
+                    // 这里改成显式报错，避免「改了 id → 悄悄多出一条记录」。
+                    OpLogService::record($type, 'update', 0, '编辑失败：资源不存在（id 可能被修改）', $id, '', $ctx);
+                    return fail(
+                        error_code()['NOT_FOUND'],
+                        '资源不存在或已被删除，请刷新后重试（唯一标识 id 创建后不可修改）'
                     );
-                } else {
-                    $before = $exists->toArray();
-                    $exists->save($normalized);
-                    $after = $model::find($id)->toArray();
-                    $this->recordSave($type, $before, $after, $id, $ctx);
                 }
+                $before = $exists->toArray();
+                $exists->save($normalized);
+                $after = $model::find($id)->toArray();
+                $this->recordSave($type, $before, $after, $id, $ctx);
             } else {
                 // 新增：id 冲突 → 1001
                 if ($exists !== null) {
