@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace app\controller;
 
 use app\service\ContentService;
+use app\service\content\AboutService;
+use app\service\content\SiteConfigService;
 use app\service\OpLogContext;
 use think\Request;
 use think\Response;
@@ -29,23 +31,46 @@ use think\Response;
  * | aboutDetail       | GET  | {P}/api/content/about/detail                |
  * | aboutSave         | POST | {P}/api/content/about/save                  |
  *
- * 所有内容操作均由 `ContentService` 编排，本控制器仅做参数读取与分发。
+ * 内容 CRUD 由 `ContentService` 编排、单例由 `AboutService` / `SiteConfigService` 承担，本控制器仅做参数读取与分发。
  */
 class Content
 {
     /**
-     * 内容业务服务
+     * 内容业务服务（产品 / 新闻 / 案例 / 优势 CRUD）
      * @var ContentService
      */
     protected ContentService $service;
 
     /**
-     * 依赖注入业务服务
-     * @param ContentService $service
+     * 关于我们（单例）服务
+     * @var AboutService
      */
-    public function __construct(ContentService $service)
-    {
-        $this->service = $service;
+    protected AboutService $aboutService;
+
+    /**
+     * 网站配置（单例）服务
+     * @var SiteConfigService
+     */
+    protected SiteConfigService $siteService;
+
+    /**
+     * 依赖注入业务服务
+     *
+     * 三块职责已在 2026-10 拆分：集合型内容 / 关于我们 / 网站配置各由独立服务承担，
+     * 控制器只做参数读取与分发。
+     *
+     * @param ContentService    $service      集合型内容
+     * @param AboutService      $aboutService 关于我们
+     * @param SiteConfigService $siteService  网站配置
+     */
+    public function __construct(
+        ContentService $service,
+        AboutService $aboutService,
+        SiteConfigService $siteService
+    ) {
+        $this->service      = $service;
+        $this->aboutService = $aboutService;
+        $this->siteService  = $siteService;
     }
 
     /* ======================= 产品 ======================= */
@@ -185,7 +210,7 @@ class Content
      */
     public function aboutDetail(Request $request): Response
     {
-        return $this->service->getAbout();
+        return $this->aboutService->getAbout();
     }
 
     /**
@@ -195,7 +220,7 @@ class Content
      */
     public function aboutSave(Request $request): Response
     {
-        return $this->service->saveAbout($this->payload($request), $this->logContext($request));
+        return $this->aboutService->saveAbout($this->payload($request), $this->logContext($request));
     }
 
     /* ======================= 网站配置 ======================= */
@@ -207,7 +232,7 @@ class Content
      */
     public function siteDetail(Request $request): Response
     {
-        return $this->service->getSiteConfig();
+        return $this->siteService->getSiteConfig();
     }
 
     /**
@@ -217,7 +242,7 @@ class Content
      */
     public function siteSave(Request $request): Response
     {
-        return $this->service->saveSiteConfig($this->payload($request), $this->logContext($request));
+        return $this->siteService->saveSiteConfig($this->payload($request), $this->logContext($request));
     }
 
     /* ======================= 内部工具 ======================= */

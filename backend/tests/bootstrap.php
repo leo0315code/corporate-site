@@ -146,6 +146,39 @@ CREATE TABLE news (
     updated_at TEXT NULL
 )
 SQL,
+    'about' => <<<'SQL'
+CREATE TABLE about (
+    id INTEGER PRIMARY KEY,
+    intro TEXT NULL,
+    vision TEXT NOT NULL DEFAULT '',
+    mission TEXT NOT NULL DEFAULT '',
+    "values" TEXT NULL,
+    timeline TEXT NULL,
+    abilities TEXT NULL,
+    updated_at TEXT NULL
+)
+SQL,
+    'site_config' => <<<'SQL'
+CREATE TABLE site_config (
+    id INTEGER PRIMARY KEY,
+    company_name TEXT NOT NULL DEFAULT '',
+    logo TEXT NOT NULL DEFAULT '',
+    slogan TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    work_time TEXT NOT NULL DEFAULT '',
+    map_image TEXT NOT NULL DEFAULT '',
+    copyright TEXT NOT NULL DEFAULT '',
+    icp TEXT NOT NULL DEFAULT '',
+    socials TEXT NULL,
+    seo_title TEXT NOT NULL DEFAULT '',
+    seo_desc TEXT NOT NULL DEFAULT '',
+    seo_keywords TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NULL
+)
+SQL,
 ];
 
 foreach ($tables as $name => $ddl) {

@@ -3,15 +3,17 @@ declare(strict_types=1);
 
 namespace app\controller;
 
-use app\service\ContentService;
+use app\service\content\AboutService;
+use app\service\content\ContentReadService;
+use app\service\content\SiteConfigService;
 use think\Request;
 use think\Response;
 
 /**
  * 前台公开内容控制器（匿名只读）
  *
- * 全部**委托 `ContentService`** 完成查询与裁剪，不复制业务逻辑、不另写 SQL。
- * 仅返回对外字段（见 `ContentService::PUBLIC_FIELDS`）。
+ * 查询与字段裁剪**全部委托** `ContentReadService`（单例走 `AboutService` / `SiteConfigService`），
+ * 不复制业务逻辑、不另写 SQL；仅返回对外字段（见 `ContentSchema::PUBLIC_FIELDS`）。
  *
  * action 命名（**必须与 C06 路由注册保持一致**）：
  * | action         | 方法 | 路由                          | 说明 |
@@ -28,18 +30,38 @@ use think\Response;
 class PublicContent
 {
     /**
-     * 内容业务服务（复用后台同一实现）
-     * @var ContentService
+     * 内容只读服务（集合型内容）
+     * @var ContentReadService
      */
-    protected ContentService $service;
+    protected ContentReadService $service;
 
     /**
-     * 依赖注入业务服务
-     * @param ContentService $service
+     * 关于我们（单例）
+     * @var AboutService
      */
-    public function __construct(ContentService $service)
-    {
-        $this->service = $service;
+    protected AboutService $aboutService;
+
+    /**
+     * 网站配置（单例）
+     * @var SiteConfigService
+     */
+    protected SiteConfigService $siteService;
+
+    /**
+     * 依赖注入服务
+     *
+     * @param ContentReadService $service      集合型内容只读
+     * @param AboutService       $aboutService 关于我们
+     * @param SiteConfigService  $siteService  网站配置
+     */
+    public function __construct(
+        ContentReadService $service,
+        AboutService $aboutService,
+        SiteConfigService $siteService
+    ) {
+        $this->service      = $service;
+        $this->aboutService = $aboutService;
+        $this->siteService  = $siteService;
     }
 
     /**
@@ -121,7 +143,7 @@ class PublicContent
      */
     public function aboutDetail(Request $request): Response
     {
-        return $this->service->getAbout();
+        return $this->aboutService->getAbout();
     }
 
     /**
@@ -134,6 +156,6 @@ class PublicContent
      */
     public function siteConfig(Request $request): Response
     {
-        return $this->service->getSiteConfig();
+        return $this->siteService->getSiteConfig();
     }
 }

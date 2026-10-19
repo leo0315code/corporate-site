@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace app\service;
 
+use app\service\content\ContentReadService;
 use think\facade\Log;
 use think\Response;
 
@@ -17,7 +18,7 @@ use think\Response;
  * - advantages ：全量（含 id，`AdvantageItem` 契约）
  * - cases      ：全量
  *
- * 排序由 `ContentService` 统一维护（product/news/case created_at|date desc，
+ * 排序由 `ContentReadService` 统一维护（product/news/case created_at|date desc，
  * advantage sort_order asc,id asc），本服务只做参数归一与编排。
  */
 class HomeService
@@ -33,15 +34,15 @@ class HomeService
 
     /**
      * 内容业务服务
-     * @var ContentService
+     * @var ContentReadService
      */
-    protected ContentService $content;
+    protected ContentReadService $content;
 
     /**
      * 依赖注入
-     * @param ContentService $content
+     * @param ContentReadService $content
      */
-    public function __construct(ContentService $content)
+    public function __construct(ContentReadService $content)
     {
         $this->content = $content;
     }
