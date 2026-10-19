@@ -698,6 +698,9 @@ export const MESSAGES = {
 ### 7.9 图片与占位
 - 统一放 `frontend/public/` 或 `src/assets/`，命名语义化（`product-1.svg`、`news-cover-1.svg`）；统一比例 `object-cover` + 圆角。
 - 未确定图片一律用 SVG 占位图，部署方按文件名替换。
+- ⚠️ **CMS 上线后**：Logo / 产品图 / 新闻封面 / 案例图 / 地图改为**后台上传**，落盘
+  `backend/public/uploads/{type}/`（随机文件名，仅 jpg/png/webp/gif，**不接受 SVG 上传**）；
+  上述静态 SVG 仅剩「数据库为空的占位显示」，不再由部署方按文件名替换。
 
 ---
 

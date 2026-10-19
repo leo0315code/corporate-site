@@ -1,5 +1,10 @@
 # 测试报告 · corporate-site（通用企业官网）
 
+> ⚠️ **历史报告（CMS 之前）**：本文件为 2026-10-16 针对 PRD v1.2 / ARCHITECTURE v1.0
+> （纯静态内容、无后台）的验收记录，**不含** CMS / 操作日志 / 安全加固等内容。
+> 当前最新验证结论见 [`CODE-REVIEW-2026-10-19.md`](CODE-REVIEW-2026-10-19.md)（PHPUnit 41 用例 + 前端构建 + 运行时冒烟）
+> 与 CI 流水线（[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)）。
+
 | 项目 | 内容 |
 | --- | --- |
 | 报告版本 | v1.0 |

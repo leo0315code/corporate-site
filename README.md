@@ -1,11 +1,13 @@
 # corporate-site（通用企业官网 + CMS 内容管理后台）
 
 > 一套**通用、可复用、可配置**的企业官网模板。前端 Vite + React 18 + React Router v6 + Tailwind CSS，后端 ThinkPHP 8 + MySQL 8。  
-> 全站内容由**站点配置 + 数据文件**驱动，换企业只需修改配置文件，**无需改动页面代码**。
+> 内容由 **CMS 后台在线维护**，`site.config.ts` / `src/data/*.ts` 仅作空值与接口失败兜底——
+> 换企业**不必改代码、不必重新构建**（仅导航菜单、页脚快速链接、主题色仍需改前端配置）。
 >
 > **本版本新增 CMS 内容管理后台**：在同一 SPA 工程内、以**独立可配置路由前缀**提供后台，
-> 在线维护产品 / 新闻 / 案例 / 优势 / 关于我们 5 类内容并查看留言；前台页面由「静态 import」
-> 改为「API 动态读取」，**后台改完刷新前台即生效**，接口失败自动降级到 `src/data/*.ts` 兜底。
+> 在线维护产品 / 新闻 / 案例 / 优势 / 关于我们 5 类内容，以及**网站配置、留言、多账号、操作日志**；
+> 前台页面由「静态 import」改为「API 动态读取」，**后台改完刷新前台即生效**，
+> 接口失败自动降级到 `src/data/*.ts` 兜底。
 > 后台详细使用说明见 **[`docs/CMS-USAGE.md`](docs/CMS-USAGE.md)**。
 
 ---
@@ -31,7 +33,7 @@ aicode/
 │   ├── tailwind.config.js        # 设计 token 固化（颜色/字体/圆角/断点）
 │   ├── postcss.config.js
 │   ├── tsconfig.json / tsconfig.node.json
-│   ├── public/                   # Logo / 占位图 / 地图占位（可直接替换）
+│   ├── public/                   # favicon / OG 封面 / 静态占位图（Logo、产品图、地图已改后台上传，不再放这里）
 │   └── src/
 │       ├── config/site.config.ts # ★ 站点配置静态兜底（公司/导航/联系/页脚/SEO；除导航/主题色/快速链接外后台可改，此处为空值兜底）
 │       ├── data/                 # ★ 内容数据（products/news/about/advantages/cases，兼作降级兜底）
@@ -51,7 +53,7 @@ aicode/
     ├── .example.env              # 环境变量示例（复制为 .env；含 CMS_PATH）
     ├── think                     # TP 命令行入口
     ├── public/index.php          # 应用入口
-    ├── database/cms.sql          # ★ 建表脚本（10 张表 + message 加列，幂等）
+    ├── database/cms.sql          # ★ 建表脚本（11 张表，含 message / op_log，幂等 + 存量表加列）
     ├── database/seed/cms-seed.json # ★ 迁移种子（源自 frontend/src/data/*.ts）
     ├── config/                   # 配置（database / app / middleware / cms ...）
     ├── route/app.php             # 路由：公共 /api/*（匿名）+ {CMS_PATH}/api/*（鉴权）
@@ -200,7 +202,7 @@ theme: { primary: '#E4572E', secondary: '#0F1B33', accent: '#00B4A6' }
 
 ## 五、CMS 内容管理后台
 
-同域、独立可配置路由前缀的在线后台，维护 5 类内容 + 查看留言。完整说明见
+同域、独立可配置路由前缀的在线后台：维护 5 类内容 + 网站配置 + 留言 + 多账号 + 操作日志。完整说明见
 [`docs/CMS-USAGE.md`](docs/CMS-USAGE.md)，此处仅列要点。
 
 ### 5.1 能力一览
